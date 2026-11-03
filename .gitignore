@@ -1,4 +1,8 @@
 .venv/
 __pycache__/
 *.pyc
-.env
+
+# 비밀 값은 절대 커밋하지 않는다
+.env*
+*.pem
+*.key
