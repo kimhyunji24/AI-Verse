@@ -126,3 +126,7 @@ git push -u origin feat/front-camera
 - 원격 변경은 rebase 하지 않고 `git pull`(merge)로 받습니다.
 - 커밋/PR에 **Claude 공동작업자(Co-Authored-By) 및 Claude 관련 표시를 절대 추가하지 않습니다.**
 - API 키 등 비밀 값은 `.env`에만 두고 절대 커밋하지 않습니다. 자세한 내용은 `SECURITY.md`를 참고합니다.
+
+## 출처
+
+- 재료 아이콘: [Game-icons.net](https://game-icons.net) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))

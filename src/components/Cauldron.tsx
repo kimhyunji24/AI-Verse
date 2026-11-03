@@ -7,6 +7,7 @@
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-03 재료를 이모지 대신 아이콘으로 표시
  */
 
 import type { CSSProperties } from "react";
@@ -64,10 +65,13 @@ export default function Cauldron({
       {ingredients.map((ingredient, index) => (
         <span
           key={ingredient.key}
-          className="anim-drop absolute top-[38%] left-1/2 text-5xl"
-          style={{ animationDelay: `${(index % 3) * 0.05}s` }}
+          className="anim-drop absolute top-[38%] left-1/2 text-6xl drop-shadow-[0_0_10px_currentColor]"
+          style={{
+            color: ingredient.color,
+            animationDelay: `${(index % 3) * 0.05}s`,
+          }}
         >
-          {ingredient.icon}
+          <ingredient.Icon />
         </span>
       ))}
 
