@@ -46,7 +46,7 @@ touch .env             # API 키를 .env에 입력 (git에 올라가지 않음)
 uvicorn app.main:app --reload --port 8000
 ```
 
-`.env`에 넣을 키: `ANTHROPIC_API_KEY` (캐릭터 생성용, 필요한 키가 늘면 여기에 추가)
+`.env`에 넣을 키: `OPENAI_API_KEY` (필수), `OPENAI_MODEL` (선택, 기본값 `gpt-6.1-terra`). 필요한 키가 늘면 여기에 추가합니다.
 
 확인: http://localhost:8000/health, API 문서: http://localhost:8000/docs
 
@@ -114,7 +114,7 @@ git push -u origin feat/front-camera
 ```
 
 - 기능 하나가 끝나면 PR로 통합 브랜치(`feat/front` 또는 `feat/back`)에 합칩니다.
-- PR은 코드 소유자(`kimhyunji24`)의 **승인을 받아야** merge할 수 있습니다.
+- PR merge는 `kimhyunji24`가 합니다. (GitHub 설정으로 강제되지 않는 팀 약속입니다)
 - 합쳐진 기능 브랜치는 삭제합니다.
 - front와 back 사이 데이터 형식(요청/응답)이 바뀌면 `docs/`의 API 명세를 `main`에서 함께 수정합니다.
 

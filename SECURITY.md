@@ -16,5 +16,5 @@ GitHub의 **Security → Report a vulnerability** 메뉴를 사용할 수 있습
 ## 레포 보호 설정
 
 - `main`, `feat/front`, `feat/back`: force push 금지, 브랜치 삭제 금지, PR 필수
-- PR은 코드 소유자(`.github/CODEOWNERS`)의 승인 후 merge
+- PR merge는 레포 주인이 진행 (승인 필수 설정은 쓰지 않음)
 - GitHub secret scanning 및 push protection 사용
