@@ -2,45 +2,38 @@
 캐릭터 생성 라우터
 
 역할: POST /api/character: 얼굴 특징값 + 응답 데이터를 받아 캐릭터 정보를 반환한다.
-비고: 현재는 더미 응답. 생성 로직(LLM/이미지)은 services/ 에 구현 예정
+비고: 룰 변환은 services/parameters.py, 글 생성은 services/story_generator.py 에 있다.
 
 수정 이력:
   - 2026-11-03 최초 작성
   - 2026-11-03 back/ 폴더를 브랜치 루트로 이동
+  - 2026-11-03 더미 응답을 제거하고 룰 파라미터 변환과 GPT 글 생성을 연결
 """
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+
+from app.schemas import CharacterRequest, CharacterResponse
+from app.services.parameters import build_parameters
+from app.services.story_generator import StoryGenerationError, generate_story
 
 router = APIRouter()
 
 
-class CharacterRequest(BaseModel):
-    # MediaPipe 랜드마크에서 추출한 수치형 특징값
-    features: dict[str, float]
-    # 참가자의 간단한 응답 결과
-    answers: dict[str, str] = {}
-
-
-class CharacterResponse(BaseModel):
-    name: str
-    race: str
-    element: str
-    stats: dict[str, int]
-    description: str
-    lucky_item: str
-    message_2027: str
-
-
 @router.post("/character", response_model=CharacterResponse)
 def create_character(req: CharacterRequest):
-    # TODO: 특징값 + 응답 -> 생성 파라미터 변환, LLM/이미지 생성 호출
+    parameters = build_parameters(req.features, req.answers)
+    try:
+        story = generate_story(parameters)
+    except StoryGenerationError as error:
+        raise HTTPException(
+            status_code=503 if error.retryable else 500,
+            detail={"message": str(error), "retryable": error.retryable},
+        ) from error
     return CharacterResponse(
-        name="미정",
-        race="미정",
-        element="미정",
-        stats={},
-        description="",
-        lucky_item="",
-        message_2027="",
+        **story.model_dump(),
+        race=parameters.race,
+        element=parameters.element,
+        disposition=parameters.disposition,
+        stats=parameters.stats,
+        parameters=parameters,
     )
