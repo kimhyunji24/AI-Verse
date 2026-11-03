@@ -8,6 +8,7 @@
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 설문 4문항 추가, 응답에 색감과 고유 능력 추가
+ *   - 2026-11-03 응답에 GPT의 선택 이유 추가
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -114,6 +115,7 @@ export type Character = {
   palette: string;
   ability: string;
   stats: Stats;
+  reason: string;
   backstory: string;
   lucky_item: string;
   message_2027: string;
