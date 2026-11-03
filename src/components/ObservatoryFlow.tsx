@@ -13,6 +13,7 @@
  *   - 2026-11-03 버튼 입력을 useArcadeButton으로 분리해 입력이 씹히는 문제 수정
  *   - 2026-11-03 측정 시간을 프레임 수 대신 실제 시간 기준으로 변경 (느린 기기에서 길어지지 않도록)
  *   - 2026-11-03 마녀 항아리 연출(재료 투입, 꾹 누르기, 끓이기, 펑, 카드 등장·하강)로 변경
+ *   - 2026-11-03 재료 목록을 이모지 글자 대신 아이콘으로 표시
  */
 
 "use client";
@@ -300,20 +301,27 @@ export default function ObservatoryFlow() {
         <div className="grid w-full items-center gap-6 md:grid-cols-2">
           <div>
             <Cauldron mood={mood} ingredients={ingredients} />
-            <p
+            <ul
               data-testid="ingredients"
-              className="mt-2 text-center text-xs text-purple-200/80"
+              className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-purple-200/80"
             >
-              {ingredients.map((item) => `${item.icon} ${item.label}`).join("  ")}
-            </p>
+              {ingredients.map((item) => (
+                <li key={item.key} className="flex items-center gap-1">
+                  <item.Icon className="text-base" style={{ color: item.color }} aria-hidden />
+                  {item.label}
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="flex flex-col items-center gap-4">
             {step === "survey" && features && (
               <SurveyStep
                 onChoose={(value) => {
-                  const [icon, label] = ANSWER_INGREDIENTS[value];
-                  addIngredient({ key: `answer:${value}`, icon, label });
+                  addIngredient({
+                    key: `answer:${value}`,
+                    ...ANSWER_INGREDIENTS[value],
+                  });
                 }}
                 onComplete={(answered) => {
                   setAnswers(answered);

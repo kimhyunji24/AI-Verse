@@ -8,6 +8,7 @@
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 재료 아이콘 표시, 숫자 키 선택, 선택 시 콜백 추가
+ *   - 2026-11-03 재료를 이모지 대신 아이콘으로 표시
  */
 
 "use client";
@@ -58,7 +59,7 @@ export default function SurveyStep({
       <h2 className="font-display text-center text-2xl">{question.title}</h2>
       <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
         {options.map((option, optionIndex) => {
-          const [icon, ingredient] = ANSWER_INGREDIENTS[option.value];
+          const { Icon, label, color } = ANSWER_INGREDIENTS[option.value];
           return (
             <button
               key={option.value}
@@ -66,11 +67,11 @@ export default function SurveyStep({
               onClick={() => choose(option.value)}
               className="flex flex-col items-center gap-1 rounded-2xl border border-purple-400/40 bg-purple-950/50 px-4 py-4 transition hover:border-emerald-300 hover:bg-purple-900/60"
             >
-              <span className="text-3xl">{icon}</span>
+              <Icon className="text-4xl" style={{ color }} aria-hidden />
               <span className="font-medium">
                 {optionIndex + 1}. {option.label}
               </span>
-              <span className="text-xs text-purple-200/70">{ingredient}</span>
+              <span className="text-xs text-purple-200/70">{label}</span>
             </button>
           );
         })}
