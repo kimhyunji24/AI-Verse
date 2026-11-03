@@ -6,6 +6,7 @@
 
 수정 이력:
   - 2026-11-03 최초 작성
+  - 2026-11-03 설문 4문항 추가, 눈 크기를 미간 너비로 교체, 색감·고유 능력 추가
 """
 
 from typing import Literal
@@ -19,7 +20,7 @@ class FaceFeatures(BaseModel):
     # 얼굴 형태 비율 (얼굴 폭 또는 높이 대비)
     face_aspect_ratio: float = Field(ge=0.5, le=2.5, description="얼굴 높이 / 얼굴 폭")
     eye_spacing_ratio: float = Field(ge=0.0, le=1.0, description="두 눈 중심 거리 / 얼굴 폭")
-    eye_size_ratio: float = Field(ge=0.0, le=1.0, description="평균 눈 폭 / 얼굴 폭")
+    inner_eye_gap_ratio: float = Field(ge=0.0, le=1.0, description="미간 너비(두 눈 안쪽 사이) / 얼굴 폭")
     nose_length_ratio: float = Field(ge=0.0, le=1.0, description="코 길이 / 얼굴 높이")
     mouth_width_ratio: float = Field(ge=0.0, le=1.0, description="입 폭 / 얼굴 폭")
     jaw_width_ratio: float = Field(ge=0.0, le=1.5, description="턱 폭 / 얼굴 폭")
@@ -35,6 +36,10 @@ class Answers(BaseModel):
     place: Literal["deep_sea", "night_sky", "old_library", "neon_city"]
     companion: Literal["alone", "one_friend", "crowd"]
     wish_2027: Literal["adventure", "rest", "growth", "connection"]
+    time_of_day: Literal["dawn", "noon", "sunset", "midnight"]
+    crisis: Literal["confront", "hide", "trick", "call_friends"]
+    power: Literal["read_minds", "stop_time", "fly", "transform"]
+    bag: Literal["snack", "book", "map", "charm"]
 
 
 class CharacterRequest(BaseModel):
@@ -65,10 +70,14 @@ class CharacterParameters(BaseModel):
     realm: str
     bond: str
     wish: str
+    crisis: str
+    lucky_item_type: str
     # 규칙표로 확정되는 캐릭터 값
     race: str
     element: str
     disposition: str
+    palette: str
+    ability: str
     stats: Stats
 
 
@@ -86,6 +95,8 @@ class CharacterResponse(GeneratedStory):
     race: str
     element: str
     disposition: str
+    palette: str
+    ability: str
     stats: Stats
     # 어떤 파라미터로 만들어졌는지 체험 화면에 보여주기 위해 함께 반환한다
     parameters: CharacterParameters

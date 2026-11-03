@@ -1,8 +1,8 @@
 """
 캐릭터 생성 파라미터 변환 (룰 베이스)
 
-역할: 얼굴 특징값과 참가자 응답을 규칙표로 변환해 종족, 속성, 성향, 능력치를 확정한다.
-비고: 규칙을 바꾸려면 이 파일 위쪽의 기준값(THRESHOLDS)과 표(RACES, ELEMENTS, DISPOSITIONS)만 고치면 된다.
+역할: 얼굴 특징값과 참가자 응답을 규칙표로 변환해 종족, 속성, 성향, 색감, 고유 능력, 능력치를 확정한다.
+비고: 규칙을 바꾸려면 이 파일 위쪽의 기준값(THRESHOLDS)과 표(RACES, ELEMENTS, DISPOSITIONS, PALETTES 등)만 고치면 된다.
       기준값은 초안이며 실제 참가자 수치를 보고 조정해야 한다.
       수치는 판타지 설정의 재료로만 쓴다. 외모·성격을 평가하는 표현을 쓰지 않으며,
       어떤 얼굴도 우열이 없도록 능력치 합계를 같게 맞춘다.
@@ -10,6 +10,7 @@
 수정 이력:
   - 2026-11-03 최초 작성
   - 2026-11-03 종족·속성·성향·능력치를 규칙표로 확정하도록 변경
+  - 2026-11-03 설문 4문항 규칙 추가, 미간 너비로 색감 결정
 """
 
 from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
@@ -18,6 +19,7 @@ from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
 THRESHOLDS = {
     "face_aspect_ratio": (1.25, 1.42),
     "eye_spacing_ratio": (0.40, 0.46),
+    "inner_eye_gap_ratio": (0.22, 0.27),
     "jaw_width_ratio": (0.78, 0.88),
     "head_yaw": (-8.0, 8.0),
 }
@@ -79,6 +81,38 @@ DISPOSITIONS = {
     ),
 }
 
+# 색감: 응답(시간대) × 미간 너비 단계
+PALETTES = {
+    "dawn": ("연보라와 새벽 안개색", "분홍과 옅은 금색", "푸른 회색과 은색"),
+    "noon": ("레몬빛과 하늘색", "흰색과 금색", "초록과 맑은 파랑"),
+    "sunset": ("주황과 자주색", "산호색과 금색", "붉은 보라와 남색"),
+    "midnight": ("남색과 은색", "검정과 달빛색", "짙은 보라와 에메랄드색"),
+}
+
+# 고유 능력: 응답(갖고 싶은 힘)
+ABILITIES = {
+    "read_minds": "마음의 소리를 듣는 힘",
+    "stop_time": "시간의 흐름을 멈추는 힘",
+    "fly": "바람을 타고 하늘을 나는 힘",
+    "transform": "무엇으로든 모습을 바꾸는 힘",
+}
+
+# 설정 글에 들어갈 일화의 방향: 응답(위기 대처)
+CRISES = {
+    "confront": "위기에 정면으로 맞서는 모습",
+    "hide": "몸을 숨겨 때를 기다리는 모습",
+    "trick": "꾀를 내어 빠져나가는 모습",
+    "call_friends": "동료를 불러 함께 헤쳐 가는 모습",
+}
+
+# 럭키 아이템의 종류: 응답(가방에 넣는 것). 구체적인 물건은 GPT가 고른다.
+LUCKY_ITEM_TYPES = {
+    "snack": "먹을거리",
+    "book": "읽을거리",
+    "map": "길을 찾는 데 쓰는 물건",
+    "charm": "행운을 비는 물건",
+}
+
 # 능력치별 계산에 쓰는 특징값과 범위 (범위 안에서 0~1로 변환해 비중으로 쓴다)
 STAT_RULES = {
     "insight": ("eye_spacing_ratio", 0.35, 0.50),
@@ -94,9 +128,17 @@ WISH_BONUS = {
     "growth": "willpower",
     "connection": "resonance",
 }
+# 위기 대처 응답이 비중을 더해 주는 능력치
+CRISIS_BONUS = {
+    "confront": "vitality",
+    "hide": "agility",
+    "trick": "insight",
+    "call_friends": "resonance",
+}
 STAT_FIELDS = ("insight", "vitality", "resonance", "agility", "willpower", "luck")
 STAT_TOTAL = 300
 STAT_MINIMUM = 30
+STAT_MAXIMUM = 100
 
 
 def _tier(features: FaceFeatures, feature: str) -> int:
@@ -122,6 +164,7 @@ def _stats(features: FaceFeatures, answers: Answers) -> Stats:
     # 운은 촬영 순간의 머리 기울기로 정한다
     weights["luck"] = _normalize(abs(features.head_yaw) + abs(features.head_roll), 0, 20)
     weights[WISH_BONUS[answers.wish_2027]] += 0.5
+    weights[CRISIS_BONUS[answers.crisis]] += 0.5
 
     # 모든 능력치에 최솟값을 보장한 뒤 나머지를 비중대로 나눠 합계를 맞춘다.
     # 비중이 전부 0이어도 나눌 수 있도록 각 항목에 0.1씩 더한다.
@@ -134,6 +177,14 @@ def _stats(features: FaceFeatures, answers: Answers) -> Stats:
     # 소수점을 버려서 남은 값은 가장 큰 능력치에 더한다
     top = max(STAT_FIELDS, key=lambda field: stats[field])
     stats[top] += STAT_TOTAL - sum(stats.values())
+
+    # 보너스가 겹쳐 최댓값을 넘으면 넘친 만큼 가장 낮은 능력치로 옮겨 합계를 유지한다
+    for field in STAT_FIELDS:
+        excess = stats[field] - STAT_MAXIMUM
+        if excess > 0:
+            stats[field] = STAT_MAXIMUM
+            lowest = min(STAT_FIELDS, key=lambda other: stats[other])
+            stats[lowest] += excess
     return Stats(**stats)
 
 
@@ -142,6 +193,7 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
     gaze = _tier(features, "eye_spacing_ratio")
     presence = _tier(features, "jaw_width_ratio")
     stance = _tier(features, "head_yaw")
+    eye_gap = _tier(features, "inner_eye_gap_ratio")
 
     return CharacterParameters(
         silhouette=SILHOUETTES[silhouette],
@@ -151,8 +203,12 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
         realm=REALMS[answers.place],
         bond=BONDS[answers.companion],
         wish=WISHES[answers.wish_2027],
+        crisis=CRISES[answers.crisis],
+        lucky_item_type=LUCKY_ITEM_TYPES[answers.bag],
         race=RACES[answers.place][silhouette],
         element=ELEMENTS[presence][gaze],
         disposition=DISPOSITIONS[answers.companion][gaze],
+        palette=PALETTES[answers.time_of_day][eye_gap],
+        ability=ABILITIES[answers.power],
         stats=_stats(features, answers),
     )
