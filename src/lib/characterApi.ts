@@ -10,6 +10,7 @@
  *   - 2026-11-03 설문 4문항 추가, 응답에 색감과 고유 능력 추가
  *   - 2026-11-03 응답에 GPT의 선택 이유 추가
  *   - 2026-11-03 캐릭터 유형 문항 추가 (인외, 애니)
+ *   - 2026-11-03 인외 선택지를 사물 머리 캐릭터로 변경
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -21,7 +22,7 @@ export const QUESTIONS = [
     key: "character_type",
     title: "어떤 모습으로 태어나게 할까요?",
     options: [
-      { value: "nonhuman", label: "신비로운 인외 존재" },
+      { value: "nonhuman", label: "머리가 사물인 캐릭터" },
       { value: "anime", label: "애니메이션 주인공" },
     ],
   },
