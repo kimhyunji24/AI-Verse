@@ -7,6 +7,7 @@
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 포토카드 디자인으로 변경, 등장·출력 애니메이션 추가
+ *   - 2026-11-03 고유 능력 표시 추가
  */
 
 import type { Character, Stats } from "@/lib/characterApi";
@@ -46,7 +47,11 @@ export default function CharacterResult({
         {character.appearance}
       </div>
 
-      <p className="text-center text-xs text-emerald-200">{character.disposition}</p>
+      <p className="text-center text-xs text-emerald-200">
+        {character.disposition}
+        <br />
+        <span className="text-amber-200/90">고유 능력</span> {character.ability}
+      </p>
 
       <dl className="grid grid-cols-3 gap-x-3 gap-y-1">
         {(Object.keys(STAT_LABELS) as (keyof Stats)[]).map((stat) => (
