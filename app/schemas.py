@@ -7,6 +7,8 @@
 수정 이력:
   - 2026-11-03 최초 작성
   - 2026-11-03 설문 4문항 추가, 눈 크기를 미간 너비로 교체, 색감·고유 능력 추가
+  - 2026-11-03 얼굴 측정 항목 확대, 룰이 후보를 만들고 GPT가 결정하는 하이브리드 구조로 변경
+  - 2026-11-03 캐릭터 유형(인외, 애니) 추가, GPT 결과를 재검증하지 않도록 변경
 """
 
 from typing import Literal
@@ -21,8 +23,13 @@ class FaceFeatures(BaseModel):
     face_aspect_ratio: float = Field(ge=0.5, le=2.5, description="얼굴 높이 / 얼굴 폭")
     eye_spacing_ratio: float = Field(ge=0.0, le=1.0, description="두 눈 중심 거리 / 얼굴 폭")
     inner_eye_gap_ratio: float = Field(ge=0.0, le=1.0, description="미간 너비(두 눈 안쪽 사이) / 얼굴 폭")
+    eye_position_ratio: float = Field(ge=0.0, le=1.0, description="이마 끝~눈 거리 / 얼굴 높이")
     nose_length_ratio: float = Field(ge=0.0, le=1.0, description="코 길이 / 얼굴 높이")
+    nose_position_ratio: float = Field(ge=0.0, le=1.0, description="이마 끝~코 밑 거리 / 얼굴 높이")
+    nose_width_ratio: float = Field(ge=0.0, le=1.0, description="코 너비 / 얼굴 폭")
     mouth_width_ratio: float = Field(ge=0.0, le=1.0, description="입 폭 / 얼굴 폭")
+    lip_thickness_ratio: float = Field(ge=0.0, le=1.0, description="입술 두께(입 벌림 제외) / 얼굴 높이")
+    mouth_position_ratio: float = Field(ge=0.0, le=1.0, description="이마 끝~입 거리 / 얼굴 높이")
     jaw_width_ratio: float = Field(ge=0.0, le=1.5, description="턱 폭 / 얼굴 폭")
     # 위치 관계 (촬영 당시 머리 자세, 도 단위)
     head_yaw: float = Field(ge=-90, le=90)
@@ -33,6 +40,7 @@ class FaceFeatures(BaseModel):
 class Answers(BaseModel):
     """참가자 응답. 프롬프트 주입을 막기 위해 자유 입력 없이 선택지만 받는다."""
 
+    character_type: Literal["nonhuman", "anime"]
     place: Literal["deep_sea", "night_sky", "old_library", "neon_city"]
     companion: Literal["alone", "one_friend", "crowd"]
     wish_2027: Literal["adventure", "rest", "growth", "connection"]
@@ -59,31 +67,40 @@ class Stats(BaseModel):
 
 
 class CharacterParameters(BaseModel):
-    """특징값과 응답을 규칙표로 변환한 캐릭터 생성 파라미터. 같은 입력이면 항상 같은 값이 나온다."""
+    """룰이 만든 결과. 같은 입력이면 항상 같은 값이 나오며, 이 전체가 GPT의 입력이 된다."""
 
-    # 특징값에서 나온 분류
+    # 얼굴 측정값을 0~1로 변환하고 반올림한 점수. 원본 수치 대신 이 값만 GPT로 보낸다.
+    face_scores: dict[str, float]
+    character_type: str
+    # 분류 문구
     silhouette: str
     gaze: str
     presence: str
     stance: str
-    # 응답에서 나온 분류
     realm: str
     bond: str
     wish: str
     crisis: str
     lucky_item_type: str
-    # 규칙표로 확정되는 캐릭터 값
+    # 룰로 확정되는 값
+    palette: str
+    ability: str
+    # GPT가 참고하는 후보
+    race_candidates: list[str]
+    element_candidates: list[str]
+    disposition_candidates: list[str]
+    # GPT가 참고해 조정하는 기본 능력치
+    base_stats: Stats
+
+
+class AiDecision(BaseModel):
+    """GPT의 결정과 글. 룰이 고치지 않고 그대로 카드에 쓴다."""
+
     race: str
     element: str
     disposition: str
-    palette: str
-    ability: str
     stats: Stats
-
-
-class GeneratedStory(BaseModel):
-    """GPT가 파라미터를 바탕으로 쓰는 글"""
-
+    reason: str
     name: str
     appearance: str
     backstory: str
@@ -91,12 +108,8 @@ class GeneratedStory(BaseModel):
     message_2027: str
 
 
-class CharacterResponse(GeneratedStory):
-    race: str
-    element: str
-    disposition: str
+class CharacterResponse(AiDecision):
     palette: str
     ability: str
-    stats: Stats
     # 어떤 파라미터로 만들어졌는지 체험 화면에 보여주기 위해 함께 반환한다
     parameters: CharacterParameters

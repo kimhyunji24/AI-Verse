@@ -1,9 +1,8 @@
 """
-캐릭터 생성 파라미터 변환 (룰 베이스)
+캐릭터 파라미터 룰 (하이브리드의 룰 담당)
 
-역할: 얼굴 특징값과 참가자 응답을 규칙표로 변환해 종족, 속성, 성향, 색감, 고유 능력, 능력치를 확정한다.
-비고: 규칙을 바꾸려면 이 파일 위쪽의 기준값(THRESHOLDS)과 표(RACES, ELEMENTS, DISPOSITIONS, PALETTES 등)만 고치면 된다.
-      기준값은 초안이며 실제 참가자 수치를 보고 조정해야 한다.
+역할: 얼굴 측정값과 응답을 점수, 후보, 기본 능력치로 변환해 GPT에 넘길 재료를 만든다.
+비고: 규칙을 바꾸려면 이 파일 위쪽의 기준값과 표만 고치면 된다. 기준값은 초안이며 실제 참가자 수치로 조정해야 한다.
       수치는 판타지 설정의 재료로만 쓴다. 외모·성격을 평가하는 표현을 쓰지 않으며,
       어떤 얼굴도 우열이 없도록 능력치 합계를 같게 맞춘다.
 
@@ -11,6 +10,8 @@
   - 2026-11-03 최초 작성
   - 2026-11-03 종족·속성·성향·능력치를 규칙표로 확정하도록 변경
   - 2026-11-03 설문 4문항 규칙 추가, 미간 너비로 색감 결정
+  - 2026-11-03 하이브리드로 변경: 값을 확정하는 대신 후보를 만들고 GPT 결정을 검증, 측정 항목 확대
+  - 2026-11-03 애니 캐릭터 후보 추가, GPT 결과 재검증 제거
 """
 
 from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
@@ -22,6 +23,21 @@ THRESHOLDS = {
     "inner_eye_gap_ratio": (0.22, 0.27),
     "jaw_width_ratio": (0.78, 0.88),
     "head_yaw": (-8.0, 8.0),
+}
+
+# 측정값을 0~1 점수로 바꾸는 범위. 머리 자세는 외모가 아니므로 점수에 넣지 않는다.
+SCORE_RANGES = {
+    "face_aspect_ratio": (1.15, 1.50),
+    "eye_spacing_ratio": (0.35, 0.50),
+    "inner_eye_gap_ratio": (0.18, 0.30),
+    "eye_position_ratio": (0.30, 0.45),
+    "nose_length_ratio": (0.20, 0.32),
+    "nose_position_ratio": (0.50, 0.68),
+    "nose_width_ratio": (0.20, 0.34),
+    "mouth_width_ratio": (0.30, 0.55),
+    "lip_thickness_ratio": (0.04, 0.14),
+    "mouth_position_ratio": (0.62, 0.82),
+    "jaw_width_ratio": (0.70, 0.95),
 }
 
 SILHOUETTES = ("넓게 퍼지는 형상", "균형 잡힌 형상", "길게 뻗는 형상")
@@ -47,22 +63,36 @@ WISHES = {
     "connection": "소중한 존재와의 연결",
 }
 
-# 종족: 응답(장소) × 실루엣 단계
-RACES = {
-    "deep_sea": ("심해 해파리족", "등불 인어족", "해류 용족"),
-    "night_sky": ("성운 고래족", "별지기족", "유성 학족"),
-    "old_library": ("서고 두더지족", "책갈피 요정족", "두루마리 뱀족"),
-    "neon_city": ("회로 고양이족", "홀로그램 정령족", "네온 사슴족"),
+CHARACTER_TYPES = {
+    "nonhuman": "인외 캐릭터",
+    "anime": "애니메이션 인물 캐릭터",
 }
 
-# 속성: 기운 단계 × 시선 단계
+# 인외 캐릭터의 종족 후보: 응답(장소) × 실루엣 단계별 2개
+NONHUMAN_RACES = {
+    "deep_sea": (("심해 해파리족", "산호 문어족"), ("등불 인어족", "진주 조개족"), ("해류 용족", "심연 장어족")),
+    "night_sky": (("성운 고래족", "구름 양족"), ("별지기족", "달토끼족"), ("유성 학족", "혜성 여우족")),
+    "old_library": (("서고 두더지족", "먼지 부엉이족"), ("책갈피 요정족", "잉크 정령족"), ("두루마리 뱀족", "사다리 거미족")),
+    "neon_city": (("회로 고양이족", "전광 너구리족"), ("홀로그램 정령족", "주파수 박쥐족"), ("네온 사슴족", "케이블 뱀족")),
+}
+
+# 애니 캐릭터의 역할 후보: 응답(장소) × 실루엣 단계별 2개
+ANIME_ROLES = {
+    "deep_sea": (("심해 등대지기", "잠수 탐험가"), ("바다 마법사", "인양 기사"), ("해류 항해사", "심해 음유시인")),
+    "night_sky": (("별자리 학자", "천문대 견습생"), ("달빛 궁수", "별똥별 배달부"), ("유성 검사", "밤하늘 지도 제작자")),
+    "old_library": (("금서 사서", "마법 필경사"), ("룬 문자 해독가", "마법학교 우등생"), ("고서 수호 기사", "두루마리 소환사")),
+    "neon_city": (("뒷골목 해커", "네온 정비사"), ("홀로그램 아이돌", "도시 탐정"), ("네온 바이크 라이더", "전광판 마법사")),
+}
+RACE_TABLES = {"nonhuman": NONHUMAN_RACES, "anime": ANIME_ROLES}
+
+# 속성 후보: 기운 단계 × 시선 단계
 ELEMENTS = (
     ("미풍", "물안개", "오로라"),
     ("수정", "달빛", "조류"),
     ("흑요", "대지", "심연"),
 )
 
-# 성향: 응답(동행) × 시선 단계
+# 성향 후보: 응답(동행) × 시선 단계
 DISPOSITIONS = {
     "alone": (
         "한 가지를 끝까지 파고드는 고독한 탐구자",
@@ -113,22 +143,21 @@ LUCKY_ITEM_TYPES = {
     "charm": "행운을 비는 물건",
 }
 
-# 능력치별 계산에 쓰는 특징값과 범위 (범위 안에서 0~1로 변환해 비중으로 쓴다)
-STAT_RULES = {
-    "insight": ("eye_spacing_ratio", 0.35, 0.50),
-    "vitality": ("jaw_width_ratio", 0.70, 0.95),
-    "resonance": ("mouth_width_ratio", 0.30, 0.45),
-    "agility": ("face_aspect_ratio", 1.15, 1.50),
-    "willpower": ("nose_length_ratio", 0.20, 0.32),
+# 능력치별로 참고하는 얼굴 점수 (평균을 비중으로 쓴다)
+STAT_SCORES = {
+    "insight": ("eye_spacing_ratio", "inner_eye_gap_ratio", "eye_position_ratio"),
+    "vitality": ("jaw_width_ratio", "nose_width_ratio"),
+    "resonance": ("mouth_width_ratio", "lip_thickness_ratio"),
+    "agility": ("face_aspect_ratio", "mouth_position_ratio"),
+    "willpower": ("nose_length_ratio", "nose_position_ratio"),
 }
-# 소원 응답이 비중을 더해 주는 능력치
+# 응답이 비중을 더해 주는 능력치
 WISH_BONUS = {
     "adventure": "agility",
     "rest": "insight",
     "growth": "willpower",
     "connection": "resonance",
 }
-# 위기 대처 응답이 비중을 더해 주는 능력치
 CRISIS_BONUS = {
     "confront": "vitality",
     "hide": "agility",
@@ -151,15 +180,30 @@ def _tier(features: FaceFeatures, feature: str) -> int:
     return 1
 
 
+def _nearest_other_tier(features: FaceFeatures, feature: str, tier: int) -> int:
+    """측정값이 가까운 쪽의 이웃 단계를 고른다. 경계에 있는 얼굴도 알맞은 후보를 받게 하기 위해서다."""
+    if tier != 1:
+        return 1
+    low, high = THRESHOLDS[feature]
+    return 0 if getattr(features, feature) < (low + high) / 2 else 2
+
+
 def _normalize(value: float, low: float, high: float) -> float:
     """value를 low~high 기준 0~1로 변환한다. 범위를 벗어나면 잘라낸다."""
     return max(0.0, min(1.0, (value - low) / (high - low)))
 
 
-def _stats(features: FaceFeatures, answers: Answers) -> Stats:
+def _face_scores(features: FaceFeatures) -> dict[str, float]:
+    return {
+        feature: round(_normalize(getattr(features, feature), low, high), 2)
+        for feature, (low, high) in SCORE_RANGES.items()
+    }
+
+
+def _base_stats(features: FaceFeatures, answers: Answers, scores: dict[str, float]) -> Stats:
     weights = {
-        stat: _normalize(getattr(features, feature), low, high)
-        for stat, (feature, low, high) in STAT_RULES.items()
+        stat: sum(scores[feature] for feature in feature_names) / len(feature_names)
+        for stat, feature_names in STAT_SCORES.items()
     }
     # 운은 촬영 순간의 머리 기울기로 정한다
     weights["luck"] = _normalize(abs(features.head_yaw) + abs(features.head_roll), 0, 20)
@@ -194,8 +238,16 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
     presence = _tier(features, "jaw_width_ratio")
     stance = _tier(features, "head_yaw")
     eye_gap = _tier(features, "inner_eye_gap_ratio")
+    scores = _face_scores(features)
+
+    races = RACE_TABLES[answers.character_type][answers.place]
+    near_silhouette = _nearest_other_tier(features, "face_aspect_ratio", silhouette)
+    near_gaze = _nearest_other_tier(features, "eye_spacing_ratio", gaze)
+    near_presence = _nearest_other_tier(features, "jaw_width_ratio", presence)
 
     return CharacterParameters(
+        face_scores=scores,
+        character_type=CHARACTER_TYPES[answers.character_type],
         silhouette=SILHOUETTES[silhouette],
         gaze=GAZES[gaze],
         presence=PRESENCES[presence],
@@ -205,10 +257,17 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
         wish=WISHES[answers.wish_2027],
         crisis=CRISES[answers.crisis],
         lucky_item_type=LUCKY_ITEM_TYPES[answers.bag],
-        race=RACES[answers.place][silhouette],
-        element=ELEMENTS[presence][gaze],
-        disposition=DISPOSITIONS[answers.companion][gaze],
         palette=PALETTES[answers.time_of_day][eye_gap],
         ability=ABILITIES[answers.power],
-        stats=_stats(features, answers),
+        race_candidates=[*races[silhouette], races[near_silhouette][0]],
+        element_candidates=[
+            ELEMENTS[presence][gaze],
+            ELEMENTS[presence][near_gaze],
+            ELEMENTS[near_presence][gaze],
+        ],
+        disposition_candidates=[
+            DISPOSITIONS[answers.companion][gaze],
+            DISPOSITIONS[answers.companion][near_gaze],
+        ],
+        base_stats=_base_stats(features, answers, scores),
     )
