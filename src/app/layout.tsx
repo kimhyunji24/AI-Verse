@@ -7,6 +7,7 @@
  *   - 2026-11-03 헤더 주석 추가 (create-next-app 기본 코드)
  *   - 2026-11-03 front/ 폴더를 브랜치 루트로 이동
  *   - 2026-11-03 제목용 글꼴(Gowun Batang) 추가, 페이지 제목과 언어 설정
+ *   - 2026-11-03 페이지 제목을 "이게 나라고?"로 변경
  */
 
 import type { Metadata } from "next";
@@ -30,8 +31,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "심연의 관측소",
-  description: "AI 캐릭터 생성 체험",
+  title: "이게 나라고?",
+  description: "AI 마녀가 끓여 주는 내 부캐 포토카드",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
