@@ -19,15 +19,13 @@
 
 ## 레포 구조
 
-하나의 레포(모노레포)에서 폴더로 front / back을 나눕니다.
+하나의 레포에서 **브랜치로 front / back을 분리**합니다. 각 브랜치의 루트가 곧 해당 프로젝트입니다.
 
-```
-AI-Verse/
-├─ front/   # 웹캠, MediaPipe 랜드마크 시각화, 터미널 로딩 화면, 결과 화면
-├─ back/    # 캐릭터 생성 API(LLM, 이미지 생성), 포토카드 합성, 프린터 출력
-├─ docs/    # 기획서, API 명세
-└─ README.md
-```
+| 브랜치 | 내용 |
+| --- | --- |
+| `main` | README, docs (기획서, API 명세) |
+| `feat/front` | Next.js — 웹캠, MediaPipe 랜드마크 시각화, 터미널 로딩 화면, 결과 화면 |
+| `feat/back` | FastAPI — 캐릭터 생성 API(LLM, 이미지 생성), 포토카드 합성, 프린터 출력 |
 
 역할 분담 (초안)
 - **front**: 얼굴 인식·랜드마크 추출(MediaPipe, 브라우저), 카운트다운/로딩/결과 UI, 아케이드 버튼 입력
@@ -35,10 +33,12 @@ AI-Verse/
 
 ## 실행 방법
 
-**back (FastAPI, 포트 8000)**
+해당 브랜치로 체크아웃한 뒤 루트에서 실행합니다.
+
+**back (`feat/back`, FastAPI, 포트 8000)**
 
 ```bash
-cd back
+git checkout feat/back
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -48,15 +48,17 @@ uvicorn app.main:app --reload --port 8000
 
 확인: http://localhost:8000/health, API 문서: http://localhost:8000/docs
 
-**front (Next.js, 포트 3000)**
+**front (`feat/front`, Next.js, 포트 3000)**
 
 ```bash
-cd front
+git checkout feat/front
 npm install
 npm run dev
 ```
 
 확인: http://localhost:3000
+
+front와 back을 함께 띄우려면 `git worktree add ../AI-Verse-back feat/back`처럼 작업 폴더를 하나 더 만들어 각각 실행합니다.
 
 ## 작업 규칙
 
@@ -66,5 +68,6 @@ npm run dev
 
 ## Git 규칙
 
-- 브랜치는 front/back 구분이 아니라 **기능 단위**로 만듭니다. (`main`, `feat/camera`, `feat/photocard` 등)
+- front / back은 **브랜치로 분리**합니다. (`feat/front`, `feat/back`) 세부 작업은 여기서 `feat/front-camera`처럼 따 갑니다.
+- 원격 변경은 rebase 하지 않고 `git pull`(merge)로 받습니다.
 - 커밋/PR에 **Claude 공동작업자(Co-Authored-By) 및 Claude 관련 표시를 절대 추가하지 않습니다.**
