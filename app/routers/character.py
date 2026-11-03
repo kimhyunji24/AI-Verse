@@ -2,7 +2,7 @@
 캐릭터 생성 라우터
 
 역할: POST /api/character: 얼굴 특징값 + 응답 데이터를 받아 캐릭터 정보를 반환한다.
-비고: 룰 변환은 services/parameters.py, 글 생성은 services/story_generator.py 에 있다.
+비고: 하이브리드 처리다. 룰(services/parameters.py)이 후보를 만들고, GPT(services/ai_character.py)가 결정하고, 룰이 검증한다.
 
 수정 이력:
   - 2026-11-03 최초 작성
@@ -13,8 +13,8 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas import CharacterRequest, CharacterResponse
-from app.services.parameters import build_parameters
-from app.services.story_generator import StoryGenerationError, generate_story
+from app.services.ai_character import CharacterAiError, decide_character
+from app.services.parameters import apply_decision, build_parameters
 
 router = APIRouter()
 
@@ -23,19 +23,15 @@ router = APIRouter()
 def create_character(req: CharacterRequest):
     parameters = build_parameters(req.features, req.answers)
     try:
-        story = generate_story(parameters)
-    except StoryGenerationError as error:
+        decision = decide_character(parameters)
+    except CharacterAiError as error:
         raise HTTPException(
             status_code=503 if error.retryable else 500,
             detail={"message": str(error), "retryable": error.retryable},
         ) from error
     return CharacterResponse(
-        **story.model_dump(),
-        race=parameters.race,
-        element=parameters.element,
-        disposition=parameters.disposition,
+        **apply_decision(parameters, decision).model_dump(),
         palette=parameters.palette,
         ability=parameters.ability,
-        stats=parameters.stats,
         parameters=parameters,
     )
