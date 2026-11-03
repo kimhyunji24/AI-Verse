@@ -7,6 +7,7 @@
 수정 이력:
   - 2026-11-03 최초 작성
   - 2026-11-03 캐릭터 유형 추가, GPT 결과를 그대로 쓰는 동작으로 변경
+  - 2026-11-03 인외 캐릭터가 머리가 사물인 캐릭터인지 확인 추가
 """
 
 import itertools
@@ -190,7 +191,8 @@ def test_character_type_changes_candidates_and_is_sent_to_ai(client, openai_serv
     anime = create(client, answers={"character_type": "anime"})["parameters"]
     assert set(nonhuman["race_candidates"]).isdisjoint(anime["race_candidates"])
     assert "애니메이션" in openai_server.requests[1]["input"]
-    assert "인외" in openai_server.requests[0]["input"]
+    assert "머리가 사물인" in openai_server.requests[0]["input"]
+    assert all("머리" in race for race in nonhuman["race_candidates"])
 
 
 # 하이브리드: 룰의 재료와 GPT의 결정
@@ -254,7 +256,8 @@ def test_instructions_explain_every_face_score(client, openai_server):
 def test_instructions_explain_both_character_types(client, openai_server):
     create(client)
     instructions = openai_server.requests[0]["instructions"]
-    assert "인외 캐릭터:" in instructions
+    assert "머리가 사물인 인외 캐릭터:" in instructions
+    assert "촉수나 괴물로 만들지 않고" in instructions
     assert "애니메이션 인물 캐릭터:" in instructions
 
 
