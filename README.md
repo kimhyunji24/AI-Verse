@@ -46,6 +46,8 @@ touch .env             # API 키를 .env에 입력 (git에 올라가지 않음)
 uvicorn app.main:app --reload --port 8000
 ```
 
+`.env`에 넣을 키: `ANTHROPIC_API_KEY` (캐릭터 생성용, 필요한 키가 늘면 여기에 추가)
+
 확인: http://localhost:8000/health, API 문서: http://localhost:8000/docs
 
 **front (`feat/front`, Next.js, 포트 3000)**
