@@ -33,6 +33,37 @@ AI-Verse/
 - **front**: 얼굴 인식·랜드마크 추출(MediaPipe, 브라우저), 카운트다운/로딩/결과 UI, 아케이드 버튼 입력
 - **back**: 캐릭터 생성(API 키 보관), 포토카드 이미지 합성, SELPHY 출력
 
+## 실행 방법
+
+**back (FastAPI, 포트 8000)**
+
+```bash
+cd back
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # API 키 입력
+uvicorn app.main:app --reload --port 8000
+```
+
+확인: http://localhost:8000/health, API 문서: http://localhost:8000/docs
+
+**front (Next.js, 포트 3000)**
+
+```bash
+cd front
+npm install
+npm run dev
+```
+
+확인: http://localhost:3000
+
+## 작업 규칙
+
+- 새 파일은 맨 위에 헤더 주석(파일 이름, 역할, 비고, 수정 이력)을 답니다.
+- 파일을 수정할 때마다 그 파일 헤더의 `수정 이력`에 `날짜 + 변경 내용`을 한 줄 추가합니다.
+- AI가 코드를 수정할 때도 예외 없이 **항상 AI가 직접** 해당 파일 헤더의 `수정 이력`을 작성합니다.
+
 ## Git 규칙
 
 - 브랜치는 front/back 구분이 아니라 **기능 단위**로 만듭니다. (`main`, `feat/camera`, `feat/photocard` 등)
