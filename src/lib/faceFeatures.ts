@@ -7,6 +7,7 @@
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-03 눈 크기를 빼고 미간 너비로 교체
  */
 
 export type Landmark = { x: number; y: number; z: number };
@@ -14,7 +15,7 @@ export type Landmark = { x: number; y: number; z: number };
 export type FaceFeatures = {
   face_aspect_ratio: number;
   eye_spacing_ratio: number;
-  eye_size_ratio: number;
+  inner_eye_gap_ratio: number;
   nose_length_ratio: number;
   mouth_width_ratio: number;
   jaw_width_ratio: number;
@@ -85,15 +86,14 @@ export function extractFeatures(
   const faceHeight = distance(p("forehead"), p("chin"));
   const eyeCenterA = midpoint(p("eyeAOuter"), p("eyeAInner"));
   const eyeCenterB = midpoint(p("eyeBOuter"), p("eyeBInner"));
-  const eyeWidth =
-    (distance(p("eyeAOuter"), p("eyeAInner")) +
-      distance(p("eyeBOuter"), p("eyeBInner"))) /
-    2;
-
   return {
     face_aspect_ratio: clamp(faceHeight / faceWidth, 0.5, 2.5),
     eye_spacing_ratio: clamp(distance(eyeCenterA, eyeCenterB) / faceWidth, 0, 1),
-    eye_size_ratio: clamp(eyeWidth / faceWidth, 0, 1),
+    inner_eye_gap_ratio: clamp(
+      distance(p("eyeAInner"), p("eyeBInner")) / faceWidth,
+      0,
+      1,
+    ),
     nose_length_ratio: clamp(
       distance(p("noseBridge"), p("noseBase")) / faceHeight,
       0,

@@ -7,6 +7,7 @@
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-03 설문 4문항 추가, 응답에 색감과 고유 능력 추가
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -43,12 +44,56 @@ export const QUESTIONS = [
       { value: "connection", label: "소중한 사람들" },
     ],
   },
+  {
+    key: "time_of_day",
+    title: "가장 좋아하는 시간은 언제인가요?",
+    options: [
+      { value: "dawn", label: "새벽" },
+      { value: "noon", label: "한낮" },
+      { value: "sunset", label: "노을 질 때" },
+      { value: "midnight", label: "한밤" },
+    ],
+  },
+  {
+    key: "crisis",
+    title: "위기가 닥치면 어떻게 할까요?",
+    options: [
+      { value: "confront", label: "맞선다" },
+      { value: "hide", label: "숨는다" },
+      { value: "trick", label: "꾀를 낸다" },
+      { value: "call_friends", label: "동료를 부른다" },
+    ],
+  },
+  {
+    key: "power",
+    title: "하나만 가질 수 있다면 어떤 힘을 고를까요?",
+    options: [
+      { value: "read_minds", label: "마음 읽기" },
+      { value: "stop_time", label: "시간 멈추기" },
+      { value: "fly", label: "하늘 날기" },
+      { value: "transform", label: "변신" },
+    ],
+  },
+  {
+    key: "bag",
+    title: "여행 가방에 꼭 넣는 것은?",
+    options: [
+      { value: "snack", label: "간식" },
+      { value: "book", label: "책" },
+      { value: "map", label: "지도" },
+      { value: "charm", label: "부적" },
+    ],
+  },
 ] as const;
 
 export type Answers = {
   place: string;
   companion: string;
   wish_2027: string;
+  time_of_day: string;
+  crisis: string;
+  power: string;
+  bag: string;
 };
 
 export type Stats = {
@@ -66,6 +111,8 @@ export type Character = {
   appearance: string;
   element: string;
   disposition: string;
+  palette: string;
+  ability: string;
   stats: Stats;
   backstory: string;
   lucky_item: string;
