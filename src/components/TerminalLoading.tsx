@@ -5,6 +5,7 @@
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-03 마녀 항아리 화면에 맞춰 크기와 색, 문구 변경
  */
 
 "use client";
@@ -21,12 +22,12 @@ export default function TerminalLoading({
 }) {
   const lines = useMemo(
     () => [
-      "> 심연의 관측소 시스템 접속",
+      "> 묘약 제조 시작",
       ...Object.entries(features).map(
         ([key, value]) => `> ${key} = ${value.toFixed(3)}`,
       ),
-      "> 관측 데이터를 파라미터로 변환 중",
-      "> 심연에서 존재의 기록을 찾는 중",
+      "> 측정값과 재료를 파라미터로 변환 중",
+      "> 항아리 속에서 존재가 깨어나는 중",
     ],
     [features],
   );
@@ -43,9 +44,9 @@ export default function TerminalLoading({
   return (
     <pre
       role="status"
-      className="min-h-64 w-full overflow-hidden rounded-xl bg-zinc-950 p-4 font-mono text-sm whitespace-pre-wrap text-teal-300"
+      className="h-44 w-full overflow-hidden rounded-xl border border-emerald-400/30 bg-black/70 p-3 font-mono text-xs whitespace-pre-wrap text-emerald-300"
     >
-      {lines.slice(0, visible).join("\n")}
+      {lines.slice(Math.max(0, visible - 9), visible).join("\n")}
       <span className="animate-pulse"> █</span>
     </pre>
   );

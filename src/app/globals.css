@@ -24,3 +24,57 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 마녀 항아리 연출 (2026-11-03 추가) */
+@keyframes smoke-rise {
+  0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+  20% { opacity: 0.8; }
+  100% { transform: translate(calc(-50% + var(--drift, 0px)), -320px) scale(2.4); opacity: 0; }
+}
+@keyframes flame-flicker {
+  0%, 100% { transform: scaleY(1) scaleX(1); opacity: 0.95; }
+  50% { transform: scaleY(1.18) scaleX(0.93); opacity: 0.75; }
+}
+@keyframes bubble-pop {
+  0% { transform: translateY(0) scale(0.4); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(-34px) scale(1.2); opacity: 0; }
+}
+@keyframes ingredient-drop {
+  0% { transform: translate(-50%, -260px) rotate(-30deg) scale(1.3); opacity: 0; }
+  15% { opacity: 1; }
+  75% { transform: translate(-50%, -10px) rotate(200deg) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, 16px) rotate(260deg) scale(0.3); opacity: 0; }
+}
+@keyframes pot-shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  25% { transform: translateX(-3px) rotate(-0.6deg); }
+  75% { transform: translateX(3px) rotate(0.6deg); }
+}
+@keyframes poof {
+  0% { opacity: 0; transform: scale(0.2); }
+  35% { opacity: 1; transform: scale(1.3); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+@keyframes card-appear {
+  0% { opacity: 0; transform: translateY(24px) scale(0.86) rotate(-3deg); filter: blur(10px); }
+  100% { opacity: 1; transform: none; filter: none; }
+}
+@keyframes card-print {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(110vh); opacity: 1; }
+}
+.anim-smoke { animation: smoke-rise var(--smoke-speed, 4s) ease-out infinite; }
+.anim-flame { animation: flame-flicker 0.5s ease-in-out infinite; transform-origin: 50% 100%; transform-box: fill-box; }
+.anim-bubble { animation: bubble-pop 1.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.anim-drop { animation: ingredient-drop 1.3s cubic-bezier(0.5, 0, 0.8, 0.6) both; }
+.anim-shake { animation: pot-shake 0.22s linear infinite; }
+.anim-poof { animation: poof 1.2s ease-out both; }
+.anim-card-appear { animation: card-appear 0.9s ease-out both; }
+.anim-card-print { animation: card-print 1.8s cubic-bezier(0.6, 0, 0.8, 0.4) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-smoke, .anim-flame, .anim-bubble, .anim-shake { animation: none; }
+}
+
+.font-display { font-family: var(--font-gowun-batang), serif; font-weight: 700; }
