@@ -14,6 +14,7 @@
  *   - 2026-11-03 측정 시간을 프레임 수 대신 실제 시간 기준으로 변경 (느린 기기에서 길어지지 않도록)
  *   - 2026-11-03 마녀 항아리 연출(재료 투입, 꾹 누르기, 끓이기, 펑, 카드 등장·하강)로 변경
  *   - 2026-11-03 재료 목록을 이모지 글자 대신 아이콘으로 표시
+ *   - 2026-11-03 펑 터질 때 "나야, 부캐" 문구 표시
  */
 
 "use client";
@@ -395,7 +396,10 @@ export default function ObservatoryFlow() {
           data-testid="poof"
           className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center"
         >
-          <div className="anim-poof h-[70vmin] w-[70vmin] rounded-full bg-white blur-3xl" />
+          <div className="anim-poof absolute h-[70vmin] w-[70vmin] rounded-full bg-white blur-3xl" />
+          <p className="font-display anim-card-appear relative text-5xl text-purple-950">
+            나야, 부캐
+          </p>
         </div>
       )}
 
