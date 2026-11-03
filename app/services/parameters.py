@@ -1,8 +1,7 @@
 """
 캐릭터 파라미터 룰 (하이브리드의 룰 담당)
 
-역할: 얼굴 측정값과 응답을 점수, 후보, 기본 능력치로 변환하고(build_parameters),
-      GPT의 결정이 후보와 범위를 벗어나지 않는지 검증한다(apply_decision).
+역할: 얼굴 측정값과 응답을 점수, 후보, 기본 능력치로 변환해 GPT에 넘길 재료를 만든다.
 비고: 규칙을 바꾸려면 이 파일 위쪽의 기준값과 표만 고치면 된다. 기준값은 초안이며 실제 참가자 수치로 조정해야 한다.
       수치는 판타지 설정의 재료로만 쓴다. 외모·성격을 평가하는 표현을 쓰지 않으며,
       어떤 얼굴도 우열이 없도록 능력치 합계를 같게 맞춘다.
@@ -12,9 +11,10 @@
   - 2026-11-03 종족·속성·성향·능력치를 규칙표로 확정하도록 변경
   - 2026-11-03 설문 4문항 규칙 추가, 미간 너비로 색감 결정
   - 2026-11-03 하이브리드로 변경: 값을 확정하는 대신 후보를 만들고 GPT 결정을 검증, 측정 항목 확대
+  - 2026-11-03 애니 캐릭터 후보 추가, GPT 결과 재검증 제거
 """
 
-from app.schemas import AiDecision, Answers, CharacterParameters, FaceFeatures, Stats
+from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
 
 # 3단계 분류 기준값: (이 값 미만이면 0단계, 이 값 초과면 2단계, 사이는 1단계)
 THRESHOLDS = {
@@ -63,13 +63,27 @@ WISHES = {
     "connection": "소중한 존재와의 연결",
 }
 
-# 종족 후보: 응답(장소) × 실루엣 단계별 2개
-RACES = {
+CHARACTER_TYPES = {
+    "nonhuman": "인외 캐릭터",
+    "anime": "애니메이션 인물 캐릭터",
+}
+
+# 인외 캐릭터의 종족 후보: 응답(장소) × 실루엣 단계별 2개
+NONHUMAN_RACES = {
     "deep_sea": (("심해 해파리족", "산호 문어족"), ("등불 인어족", "진주 조개족"), ("해류 용족", "심연 장어족")),
     "night_sky": (("성운 고래족", "구름 양족"), ("별지기족", "달토끼족"), ("유성 학족", "혜성 여우족")),
     "old_library": (("서고 두더지족", "먼지 부엉이족"), ("책갈피 요정족", "잉크 정령족"), ("두루마리 뱀족", "사다리 거미족")),
     "neon_city": (("회로 고양이족", "전광 너구리족"), ("홀로그램 정령족", "주파수 박쥐족"), ("네온 사슴족", "케이블 뱀족")),
 }
+
+# 애니 캐릭터의 역할 후보: 응답(장소) × 실루엣 단계별 2개
+ANIME_ROLES = {
+    "deep_sea": (("심해 등대지기", "잠수 탐험가"), ("바다 마법사", "인양 기사"), ("해류 항해사", "심해 음유시인")),
+    "night_sky": (("별자리 학자", "천문대 견습생"), ("달빛 궁수", "별똥별 배달부"), ("유성 검사", "밤하늘 지도 제작자")),
+    "old_library": (("금서 사서", "마법 필경사"), ("룬 문자 해독가", "마법학교 우등생"), ("고서 수호 기사", "두루마리 소환사")),
+    "neon_city": (("뒷골목 해커", "네온 정비사"), ("홀로그램 아이돌", "도시 탐정"), ("네온 바이크 라이더", "전광판 마법사")),
+}
+RACE_TABLES = {"nonhuman": NONHUMAN_RACES, "anime": ANIME_ROLES}
 
 # 속성 후보: 기운 단계 × 시선 단계
 ELEMENTS = (
@@ -154,8 +168,6 @@ STAT_FIELDS = ("insight", "vitality", "resonance", "agility", "willpower", "luck
 STAT_TOTAL = 300
 STAT_MINIMUM = 30
 STAT_MAXIMUM = 100
-# GPT가 기본 능력치에서 조정할 수 있는 폭
-STAT_AI_RANGE = 10
 
 
 def _tier(features: FaceFeatures, feature: str) -> int:
@@ -228,13 +240,14 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
     eye_gap = _tier(features, "inner_eye_gap_ratio")
     scores = _face_scores(features)
 
-    races = RACES[answers.place]
+    races = RACE_TABLES[answers.character_type][answers.place]
     near_silhouette = _nearest_other_tier(features, "face_aspect_ratio", silhouette)
     near_gaze = _nearest_other_tier(features, "eye_spacing_ratio", gaze)
     near_presence = _nearest_other_tier(features, "jaw_width_ratio", presence)
 
     return CharacterParameters(
         face_scores=scores,
+        character_type=CHARACTER_TYPES[answers.character_type],
         silhouette=SILHOUETTES[silhouette],
         gaze=GAZES[gaze],
         presence=PRESENCES[presence],
@@ -257,41 +270,4 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
             DISPOSITIONS[answers.companion][near_gaze],
         ],
         base_stats=_base_stats(features, answers, scores),
-    )
-
-
-def _finalize_stats(base: Stats, proposed: Stats) -> Stats:
-    """GPT가 제안한 능력치를 기본값 ±STAT_AI_RANGE, 최댓값, 합계 300 안으로 맞춘다."""
-    base_values = base.model_dump()
-    low = {field: base_values[field] - STAT_AI_RANGE for field in STAT_FIELDS}
-    high = {field: min(STAT_MAXIMUM, base_values[field] + STAT_AI_RANGE) for field in STAT_FIELDS}
-    stats = {
-        field: max(low[field], min(high[field], getattr(proposed, field)))
-        for field in STAT_FIELDS
-    }
-
-    # 기본값 자체가 합계 300이고 범위 안에 있으므로 한 칸씩 옮기면 반드시 맞출 수 있다
-    while (difference := STAT_TOTAL - sum(stats.values())) != 0:
-        step = 1 if difference > 0 else -1
-        for field in STAT_FIELDS:
-            if sum(stats.values()) == STAT_TOTAL:
-                break
-            if low[field] <= stats[field] + step <= high[field]:
-                stats[field] += step
-    return Stats(**stats)
-
-
-def apply_decision(parameters: CharacterParameters, decision: AiDecision) -> AiDecision:
-    """후보 밖의 값은 룰이 정한 첫 번째 후보로 되돌리고 능력치를 범위 안으로 맞춘다."""
-
-    def pick(value: str, candidates: list[str]) -> str:
-        return value if value in candidates else candidates[0]
-
-    return decision.model_copy(
-        update={
-            "race": pick(decision.race, parameters.race_candidates),
-            "element": pick(decision.element, parameters.element_candidates),
-            "disposition": pick(decision.disposition, parameters.disposition_candidates),
-            "stats": _finalize_stats(parameters.base_stats, decision.stats),
-        }
     )

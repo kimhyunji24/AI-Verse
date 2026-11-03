@@ -6,6 +6,7 @@
 
 수정 이력:
   - 2026-11-03 최초 작성
+  - 2026-11-03 캐릭터 유형 추가, GPT 결과를 그대로 쓰는 동작으로 변경
 """
 
 import itertools
@@ -29,6 +30,7 @@ FEATURES = {
     "head_roll": 1.0,
 }
 ANSWERS = {
+    "character_type": "nonhuman",
     "place": "deep_sea",
     "companion": "alone",
     "wish_2027": "adventure",
@@ -38,6 +40,7 @@ ANSWERS = {
     "bag": "book",
 }
 ANSWER_OPTIONS = {
+    "character_type": ["nonhuman", "anime"],
     "place": ["deep_sea", "night_sky", "old_library", "neon_city"],
     "companion": ["alone", "one_friend", "crowd"],
     "wish_2027": ["adventure", "rest", "growth", "connection"],
@@ -182,7 +185,15 @@ def test_answers_change_the_result(client, openai_server, question, field):
     assert len({str(result) for result in results}) == len(results)
 
 
-# 하이브리드: GPT의 결정과 룰의 검증
+def test_character_type_changes_candidates_and_is_sent_to_ai(client, openai_server):
+    nonhuman = create(client, answers={"character_type": "nonhuman"})["parameters"]
+    anime = create(client, answers={"character_type": "anime"})["parameters"]
+    assert set(nonhuman["race_candidates"]).isdisjoint(anime["race_candidates"])
+    assert "애니메이션" in openai_server.requests[1]["input"]
+    assert "인외" in openai_server.requests[0]["input"]
+
+
+# 하이브리드: 룰의 재료와 GPT의 결정
 
 
 def test_ai_choice_within_candidates_is_used(client, openai_server):
@@ -201,43 +212,21 @@ def test_ai_choice_within_candidates_is_used(client, openai_server):
     assert data["disposition"] == data["parameters"]["disposition_candidates"][-1]
 
 
-def test_ai_choice_outside_candidates_is_replaced(client, openai_server):
+def test_ai_result_is_used_as_is(client, openai_server):
+    """후보 밖의 값이나 범위를 넘는 능력치도 룰이 고치지 않는다"""
+    stats = {"insight": 90, "vitality": 10, "resonance": 60, "agility": 40, "willpower": 70, "luck": 30}
     openai_server.choose = lambda parameters: {
         **openai_server.first_candidates(parameters),
-        "race": "드래곤",
-        "element": "불",
-        "disposition": "잘생긴 영웅",
+        "race": "새로 지은 종족",
+        "element": "새 속성",
+        "disposition": "새로 지은 성향",
+        "stats": stats,
     }
     data = create(client)
-    assert data["race"] in data["parameters"]["race_candidates"]
-    assert data["element"] in data["parameters"]["element_candidates"]
-    assert data["disposition"] in data["parameters"]["disposition_candidates"]
-
-
-def test_ai_small_stat_adjustment_is_used(client, openai_server):
-    def adjust(parameters):
-        stats = dict(parameters["base_stats"])
-        stats["insight"] += 5
-        stats["luck"] -= 5
-        return {**openai_server.first_candidates(parameters), "stats": stats}
-
-    openai_server.choose = adjust
-    data = create(client)
-    base = data["parameters"]["base_stats"]
-    assert data["stats"]["insight"] == base["insight"] + 5
-    assert data["stats"]["luck"] == base["luck"] - 5
-
-
-@pytest.mark.parametrize("value", [999, -5, 0])
-def test_ai_stats_out_of_range_are_corrected(client, openai_server, value):
-    openai_server.choose = lambda parameters: {
-        **openai_server.first_candidates(parameters),
-        "stats": dict.fromkeys(parameters["base_stats"], value),
-    }
-    data = create(client)
-    assert_valid_stats(data["stats"])
-    base = data["parameters"]["base_stats"]
-    assert all(abs(data["stats"][key] - base[key]) <= 10 for key in base)
+    assert data["race"] == "새로 지은 종족"
+    assert data["element"] == "새 속성"
+    assert data["disposition"] == "새로 지은 성향"
+    assert data["stats"] == stats
 
 
 # 개인정보: 밖으로 나가는 데이터
@@ -260,6 +249,13 @@ def test_instructions_explain_every_face_score(client, openai_server):
     instructions = openai_server.requests[0]["instructions"]
     for name in data["parameters"]["face_scores"]:
         assert f"- {name}:" in instructions, name
+
+
+def test_instructions_explain_both_character_types(client, openai_server):
+    create(client)
+    instructions = openai_server.requests[0]["instructions"]
+    assert "인외 캐릭터:" in instructions
+    assert "애니메이션 인물 캐릭터:" in instructions
 
 
 def test_instructions_forbid_judging_the_participant(client, openai_server):

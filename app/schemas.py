@@ -8,6 +8,7 @@
   - 2026-11-03 최초 작성
   - 2026-11-03 설문 4문항 추가, 눈 크기를 미간 너비로 교체, 색감·고유 능력 추가
   - 2026-11-03 얼굴 측정 항목 확대, 룰이 후보를 만들고 GPT가 결정하는 하이브리드 구조로 변경
+  - 2026-11-03 캐릭터 유형(인외, 애니) 추가, GPT 결과를 재검증하지 않도록 변경
 """
 
 from typing import Literal
@@ -39,6 +40,7 @@ class FaceFeatures(BaseModel):
 class Answers(BaseModel):
     """참가자 응답. 프롬프트 주입을 막기 위해 자유 입력 없이 선택지만 받는다."""
 
+    character_type: Literal["nonhuman", "anime"]
     place: Literal["deep_sea", "night_sky", "old_library", "neon_city"]
     companion: Literal["alone", "one_friend", "crowd"]
     wish_2027: Literal["adventure", "rest", "growth", "connection"]
@@ -69,6 +71,7 @@ class CharacterParameters(BaseModel):
 
     # 얼굴 측정값을 0~1로 변환하고 반올림한 점수. 원본 수치 대신 이 값만 GPT로 보낸다.
     face_scores: dict[str, float]
+    character_type: str
     # 분류 문구
     silhouette: str
     gaze: str
@@ -82,16 +85,16 @@ class CharacterParameters(BaseModel):
     # 룰로 확정되는 값
     palette: str
     ability: str
-    # GPT가 이 안에서 고르는 후보
+    # GPT가 참고하는 후보
     race_candidates: list[str]
     element_candidates: list[str]
     disposition_candidates: list[str]
-    # GPT가 범위 안에서 조정하는 기본 능력치
+    # GPT가 참고해 조정하는 기본 능력치
     base_stats: Stats
 
 
 class AiDecision(BaseModel):
-    """GPT의 결정과 글. 룰이 후보 포함 여부와 능력치 범위를 다시 검증한다."""
+    """GPT의 결정과 글. 룰이 고치지 않고 그대로 카드에 쓴다."""
 
     race: str
     element: str
