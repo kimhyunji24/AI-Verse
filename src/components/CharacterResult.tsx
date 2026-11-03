@@ -8,6 +8,7 @@
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 포토카드 디자인으로 변경, 등장·출력 애니메이션 추가
  *   - 2026-11-03 고유 능력 표시 추가
+ *   - 2026-11-03 GPT의 선택 이유(묘약 기록) 표시 추가
  */
 
 import type { Character, Stats } from "@/lib/characterApi";
@@ -62,6 +63,7 @@ export default function CharacterResult({
         ))}
       </dl>
 
+      <p className="text-center text-xs text-purple-200/80 italic">{character.reason}</p>
       <p className="text-xs leading-relaxed">{character.backstory}</p>
       <p className="text-xs">
         <span className="text-amber-200/90">럭키 아이템</span> {character.lucky_item}

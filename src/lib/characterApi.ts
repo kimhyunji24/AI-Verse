@@ -8,6 +8,8 @@
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 설문 4문항 추가, 응답에 색감과 고유 능력 추가
+ *   - 2026-11-03 응답에 GPT의 선택 이유 추가
+ *   - 2026-11-03 캐릭터 유형 문항 추가 (인외, 애니)
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -15,6 +17,14 @@ import type { FaceFeatures } from "@/lib/faceFeatures";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export const QUESTIONS = [
+  {
+    key: "character_type",
+    title: "어떤 모습으로 태어나게 할까요?",
+    options: [
+      { value: "nonhuman", label: "신비로운 인외 존재" },
+      { value: "anime", label: "애니메이션 주인공" },
+    ],
+  },
   {
     key: "place",
     title: "가장 끌리는 곳은 어디인가요?",
@@ -87,6 +97,7 @@ export const QUESTIONS = [
 ] as const;
 
 export type Answers = {
+  character_type: string;
   place: string;
   companion: string;
   wish_2027: string;
@@ -114,6 +125,7 @@ export type Character = {
   palette: string;
   ability: string;
   stats: Stats;
+  reason: string;
   backstory: string;
   lucky_item: string;
   message_2027: string;

@@ -8,6 +8,7 @@
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 눈 크기를 빼고 미간 너비로 교체
+ *   - 2026-11-03 눈·코·입 위치, 코 너비, 입술 두께 측정 추가
  */
 
 export type Landmark = { x: number; y: number; z: number };
@@ -16,8 +17,13 @@ export type FaceFeatures = {
   face_aspect_ratio: number;
   eye_spacing_ratio: number;
   inner_eye_gap_ratio: number;
+  eye_position_ratio: number;
   nose_length_ratio: number;
+  nose_position_ratio: number;
+  nose_width_ratio: number;
   mouth_width_ratio: number;
+  lip_thickness_ratio: number;
+  mouth_position_ratio: number;
   jaw_width_ratio: number;
   head_yaw: number;
   head_pitch: number;
@@ -45,8 +51,14 @@ const POINTS = {
   eyeBOuter: 263,
   noseBridge: 168,
   noseBase: 2,
+  noseWingA: 64,
+  noseWingB: 294,
   mouthA: 61,
   mouthB: 291,
+  lipOuterTop: 0,
+  lipOuterBottom: 17,
+  lipInnerTop: 13,
+  lipInnerBottom: 14,
   jawA: 172,
   jawB: 397,
 } as const;
@@ -86,6 +98,13 @@ export function extractFeatures(
   const faceHeight = distance(p("forehead"), p("chin"));
   const eyeCenterA = midpoint(p("eyeAOuter"), p("eyeAInner"));
   const eyeCenterB = midpoint(p("eyeBOuter"), p("eyeBInner"));
+  const eyeCenter = midpoint(eyeCenterA, eyeCenterB);
+  const mouthCenter = midpoint(p("lipInnerTop"), p("lipInnerBottom"));
+  // 입을 벌려도 값이 변하지 않도록 입안 높이를 뺀다
+  const lipThickness =
+    distance(p("lipOuterTop"), p("lipOuterBottom")) -
+    distance(p("lipInnerTop"), p("lipInnerBottom"));
+
   return {
     face_aspect_ratio: clamp(faceHeight / faceWidth, 0.5, 2.5),
     eye_spacing_ratio: clamp(distance(eyeCenterA, eyeCenterB) / faceWidth, 0, 1),
@@ -94,12 +113,29 @@ export function extractFeatures(
       0,
       1,
     ),
+    eye_position_ratio: clamp(distance(p("forehead"), eyeCenter) / faceHeight, 0, 1),
     nose_length_ratio: clamp(
       distance(p("noseBridge"), p("noseBase")) / faceHeight,
       0,
       1,
     ),
+    nose_position_ratio: clamp(
+      distance(p("forehead"), p("noseBase")) / faceHeight,
+      0,
+      1,
+    ),
+    nose_width_ratio: clamp(
+      distance(p("noseWingA"), p("noseWingB")) / faceWidth,
+      0,
+      1,
+    ),
     mouth_width_ratio: clamp(distance(p("mouthA"), p("mouthB")) / faceWidth, 0, 1),
+    lip_thickness_ratio: clamp(lipThickness / faceHeight, 0, 1),
+    mouth_position_ratio: clamp(
+      distance(p("forehead"), mouthCenter) / faceHeight,
+      0,
+      1,
+    ),
     jaw_width_ratio: clamp(distance(p("jawA"), p("jawB")) / faceWidth, 0, 1.5),
     // 좌우 뺨, 위아래, 두 눈의 깊이·높이 차이로 머리 방향을 구한다
     head_yaw: clamp(

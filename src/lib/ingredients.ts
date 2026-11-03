@@ -10,6 +10,7 @@
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 임시 이모지를 Game-icons 아이콘과 재료별 색으로 교체
  *   - 2026-11-03 설문 4문항의 재료 추가
+ *   - 2026-11-03 캐릭터 유형 재료 추가
  */
 
 import type { IconType } from "react-icons";
@@ -36,6 +37,7 @@ import {
   GiMoon,
   GiMushroomGills,
   GiNightSky,
+  GiRibbon,
   GiScrollUnfurled,
   GiSewingString,
   GiSparkles,
@@ -46,6 +48,7 @@ import {
   GiSun,
   GiSunrise,
   GiSunset,
+  GiTentacleStrike,
   GiTreasureMap,
   GiWaterDrop,
   GiWhirlwind,
@@ -90,6 +93,8 @@ export function faceIngredients(features: FaceFeatures): Ingredient[] {
 
 // 설문 선택지별 재료. 키는 lib/characterApi.ts 의 QUESTIONS 값과 같다.
 export const ANSWER_INGREDIENTS: Record<string, IngredientLook> = {
+  nonhuman: { Icon: GiTentacleStrike, label: "꿈틀대는 촉수", color: "#a78bfa" },
+  anime: { Icon: GiRibbon, label: "반짝이는 리본", color: "#f9a8d4" },
   deep_sea: { Icon: GiSpiralShell, label: "심해 소라", color: "#5eead4" },
   night_sky: { Icon: GiFallingStar, label: "떨어진 별", color: "#fde047" },
   old_library: { Icon: GiScrollUnfurled, label: "낡은 책장", color: "#d6b98c" },

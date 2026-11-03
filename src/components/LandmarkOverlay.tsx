@@ -7,6 +7,7 @@
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-03 코 너비, 미간, 입술 두께 측정선 추가
  */
 
 "use client";
@@ -26,6 +27,9 @@ const MEASURE_LINES = [
   [61, 291],
   [172, 397],
   [168, 2],
+  [64, 294],
+  [133, 362],
+  [0, 17],
 ];
 
 export default function LandmarkOverlay({ ref }: { ref: Ref<OverlayHandle> }) {
