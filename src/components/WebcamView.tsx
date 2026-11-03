@@ -2,17 +2,18 @@
  * 웹캠 화면 컴포넌트 (WebcamView)
  *
  * 역할: 웹캠 영상을 거울처럼 좌우 반전해 보여주고, 연결 상태(권한 요청/거부/오류)를 안내한다.
- *       마운트되면 자동으로 카메라를 켠다. (부스에서 착석 시 바로 시작)
- * 비고: 얼굴 인식·랜드마크 표시는 feat/front-landmark 브랜치에서 이 위에 얹는다.
+ *       children으로 받은 요소(랜드마크, 안내 문구)를 영상 위에 겹쳐 보여준다.
+ * 비고: 카메라 연결은 부모가 useWebcam으로 관리하고 결과를 webcam으로 넘겨준다.
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-03 웹캠 상태를 부모에서 받고 영상 위에 children을 겹치도록 변경
  */
 
 "use client";
 
-import { useEffect } from "react";
-import { useWebcam, type WebcamStatus } from "@/hooks/useWebcam";
+import type { ReactNode } from "react";
+import type { useWebcam, WebcamStatus } from "@/hooks/useWebcam";
 
 const MESSAGES: Record<WebcamStatus, string> = {
   idle: "카메라를 준비하고 있어요",
@@ -23,13 +24,14 @@ const MESSAGES: Record<WebcamStatus, string> = {
   error: "카메라를 켤 수 없어요. 연결 상태와 다른 앱의 사용 여부를 확인해 주세요",
 };
 
-export default function WebcamView() {
-  const { videoRef, status, start } = useWebcam();
-
-  useEffect(() => {
-    start();
-  }, [start]);
-
+export default function WebcamView({
+  webcam,
+  children,
+}: {
+  webcam: ReturnType<typeof useWebcam>;
+  children?: ReactNode;
+}) {
+  const { videoRef, status, start } = webcam;
   const showRetry = status === "denied" || status === "error";
 
   return (
@@ -41,6 +43,7 @@ export default function WebcamView() {
         playsInline
         muted
       />
+      {children}
       {status !== "ready" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center text-zinc-200">
           <p>{MESSAGES[status]}</p>
