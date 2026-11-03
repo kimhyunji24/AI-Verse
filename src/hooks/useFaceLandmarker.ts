@@ -7,6 +7,7 @@
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-03 모델을 한 번만 로드하도록 변경, MediaPipe 안내 로그가 오류로 표시되지 않도록 처리
  */
 
 "use client";
@@ -22,7 +23,20 @@ const MODEL_URL =
 
 export type LandmarkerStatus = "loading" | "ready" | "error";
 
+/**
+ * MediaPipe는 INFO 로그까지 console.error로 출력해 개발 화면에 오류처럼 표시된다.
+ * "INFO:"로 시작하는 줄만 걸러내고 실제 오류는 그대로 둔다.
+ */
+function silenceMediapipeInfoLogs() {
+  const original = console.error;
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === "string" && args[0].startsWith("INFO:")) return;
+    original(...args);
+  };
+}
+
 async function createLandmarker(): Promise<FaceLandmarker> {
+  silenceMediapipeInfoLogs();
   // 브라우저 전용 라이브러리라 서버 렌더링에서 제외되도록 여기서 불러온다
   const { FaceLandmarker, FilesetResolver } = await import(
     "@mediapipe/tasks-vision"
@@ -42,6 +56,18 @@ async function createLandmarker(): Promise<FaceLandmarker> {
     // GPU를 쓸 수 없는 기기에서는 느리더라도 CPU로 동작시킨다
     return await create("CPU");
   }
+}
+
+// 모델 로드는 무거우므로 화면을 다시 그리거나 다음 참가자로 넘어가도 하나를 계속 쓴다
+let landmarkerPromise: Promise<FaceLandmarker> | null = null;
+
+function getLandmarker() {
+  landmarkerPromise ??= createLandmarker().catch((error) => {
+    // 실패하면 새로고침 없이도 다시 시도할 수 있게 비워 둔다
+    landmarkerPromise = null;
+    throw error;
+  });
+  return landmarkerPromise;
 }
 
 export function useFaceLandmarker(
@@ -76,12 +102,9 @@ export function useFaceLandmarker(
       frameId = requestAnimationFrame(loop);
     };
 
-    createLandmarker()
+    getLandmarker()
       .then((created) => {
-        if (cancelled) {
-          created.close();
-          return;
-        }
+        if (cancelled) return;
         landmarker = created;
         setStatus("ready");
         loop();
@@ -94,7 +117,6 @@ export function useFaceLandmarker(
     return () => {
       cancelled = true;
       cancelAnimationFrame(frameId);
-      landmarker?.close();
     };
   }, [videoRef]);
 
