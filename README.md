@@ -42,7 +42,7 @@ git checkout feat/back
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # API 키 입력
+touch .env             # API 키를 .env에 입력 (git에 올라가지 않음)
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -112,6 +112,7 @@ git push -u origin feat/front-camera
 ```
 
 - 기능 하나가 끝나면 PR로 통합 브랜치(`feat/front` 또는 `feat/back`)에 합칩니다.
+- PR은 코드 소유자(`kimhyunji24`)의 **승인을 받아야** merge할 수 있습니다.
 - 합쳐진 기능 브랜치는 삭제합니다.
 - front와 back 사이 데이터 형식(요청/응답)이 바뀌면 `docs/`의 API 명세를 `main`에서 함께 수정합니다.
 
@@ -122,3 +123,4 @@ git push -u origin feat/front-camera
   - 변경이 여러 개면 제목 아래 `-` 목록으로 풀어 씁니다.
 - 원격 변경은 rebase 하지 않고 `git pull`(merge)로 받습니다.
 - 커밋/PR에 **Claude 공동작업자(Co-Authored-By) 및 Claude 관련 표시를 절대 추가하지 않습니다.**
+- API 키 등 비밀 값은 `.env`에만 두고 절대 커밋하지 않습니다. 자세한 내용은 `SECURITY.md`를 참고합니다.
