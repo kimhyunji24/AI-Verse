@@ -5,6 +5,7 @@
 
 수정 이력:
   - 2026-11-03 최초 작성
+  - 2026-11-03 설문 4문항과 응답 필드 추가 반영
 """
 
 from types import SimpleNamespace
@@ -24,7 +25,7 @@ BODY = {
     "features": {
         "face_aspect_ratio": 1.33,
         "eye_spacing_ratio": 0.43,
-        "eye_size_ratio": 0.2,
+        "inner_eye_gap_ratio": 0.25,
         "nose_length_ratio": 0.26,
         "mouth_width_ratio": 0.38,
         "jaw_width_ratio": 0.83,
@@ -32,7 +33,15 @@ BODY = {
         "head_pitch": -3.0,
         "head_roll": 1.0,
     },
-    "answers": {"place": "deep_sea", "companion": "alone", "wish_2027": "adventure"},
+    "answers": {
+        "place": "deep_sea",
+        "companion": "alone",
+        "wish_2027": "adventure",
+        "time_of_day": "dawn",
+        "crisis": "confront",
+        "power": "fly",
+        "bag": "book",
+    },
 }
 
 STORY = GeneratedStory(
@@ -70,6 +79,8 @@ def test_response_combines_rules_and_story(monkeypatch):
     data = response.json()
     assert data["name"] == "루미"
     assert data["race"] == "등불 인어족"
+    assert data["ability"] == "바람을 타고 하늘을 나는 힘"
+    assert data["palette"]
     assert sum(data["stats"].values()) == 300
     assert "심해" in data["parameters"]["realm"]
 

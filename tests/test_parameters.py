@@ -5,6 +5,7 @@
 
 수정 이력:
   - 2026-11-03 최초 작성
+  - 2026-11-03 설문 4문항과 미간 너비 규칙 검증 추가
 """
 
 import itertools
@@ -15,7 +16,7 @@ from app.services.parameters import STAT_TOTAL, build_parameters
 FEATURES = dict(
     face_aspect_ratio=1.33,
     eye_spacing_ratio=0.43,
-    eye_size_ratio=0.2,
+    inner_eye_gap_ratio=0.25,
     nose_length_ratio=0.26,
     mouth_width_ratio=0.38,
     jaw_width_ratio=0.83,
@@ -23,7 +24,15 @@ FEATURES = dict(
     head_pitch=-3.0,
     head_roll=1.0,
 )
-ANSWERS = Answers(place="deep_sea", companion="alone", wish_2027="adventure")
+ANSWERS = Answers(
+    place="deep_sea",
+    companion="alone",
+    wish_2027="adventure",
+    time_of_day="dawn",
+    crisis="confront",
+    power="fly",
+    bag="book",
+)
 
 
 def test_same_input_gives_same_parameters():
@@ -42,8 +51,11 @@ def test_stat_total_is_fixed_for_extreme_faces():
     }
     for values in itertools.product(*ranges.values()):
         features = FaceFeatures(**{**FEATURES, **dict(zip(ranges, values))})
-        for wish in ("adventure", "rest", "growth", "connection"):
-            answers = ANSWERS.model_copy(update={"wish_2027": wish})
+        for wish, crisis in itertools.product(
+            ("adventure", "rest", "growth", "connection"),
+            ("confront", "hide", "trick", "call_friends"),
+        ):
+            answers = ANSWERS.model_copy(update={"wish_2027": wish, "crisis": crisis})
             stats = build_parameters(features, answers).stats
             assert sum(stats.model_dump().values()) == STAT_TOTAL
             assert all(1 <= value <= 100 for value in stats.model_dump().values()), stats
@@ -71,6 +83,25 @@ def test_every_rule_combination_has_a_value():
             features = FaceFeatures(
                 **{**FEATURES, "face_aspect_ratio": ratio, "eye_spacing_ratio": spacing, "jaw_width_ratio": jaw}
             )
-            answers = Answers(place=place, companion=companion, wish_2027="rest")
+            answers = ANSWERS.model_copy(update={"place": place, "companion": companion})
             parameters = build_parameters(features, answers)
             assert parameters.race and parameters.element and parameters.disposition
+
+
+def test_eye_gap_and_new_answers_change_parameters():
+    narrow = FaceFeatures(**{**FEATURES, "inner_eye_gap_ratio": 0.18})
+    wide = FaceFeatures(**{**FEATURES, "inner_eye_gap_ratio": 0.30})
+    assert build_parameters(narrow, ANSWERS).palette == "연보라와 새벽 안개색"
+    assert build_parameters(wide, ANSWERS).palette == "푸른 회색과 은색"
+
+    parameters = build_parameters(FaceFeatures(**FEATURES), ANSWERS)
+    assert parameters.ability == "바람을 타고 하늘을 나는 힘"
+    assert parameters.lucky_item_type == "읽을거리"
+    assert "맞서는" in parameters.crisis
+
+
+def test_crisis_answer_raises_matching_stat():
+    features = FaceFeatures(**FEATURES)
+    calm = ANSWERS.model_copy(update={"crisis": "hide"})
+    bold = ANSWERS.model_copy(update={"crisis": "confront"})
+    assert build_parameters(features, bold).stats.vitality > build_parameters(features, calm).stats.vitality

@@ -34,6 +34,8 @@ def create_character(req: CharacterRequest):
         race=parameters.race,
         element=parameters.element,
         disposition=parameters.disposition,
+        palette=parameters.palette,
+        ability=parameters.ability,
         stats=parameters.stats,
         parameters=parameters,
     )

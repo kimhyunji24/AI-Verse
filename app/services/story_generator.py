@@ -7,6 +7,7 @@
 
 수정 이력:
   - 2026-11-03 최초 작성
+  - 2026-11-03 색감, 고유 능력, 위기 일화, 럭키 아이템 종류를 글에 반영하도록 지시 추가
 """
 
 import os
@@ -22,13 +23,13 @@ DEFAULT_MODEL = "gpt-6.1-terra"
 INSTRUCTIONS = """너는 체험 부스 '심연의 관측소'의 기록 담당자다. 관측소가 심연에서 찾아낸 가상의 존재를 기록한다.
 입력으로 받은 파라미터에 맞춰 판타지 캐릭터의 글을 한국어로 써라. 결과는 참가자가 포토카드로 받아 간다.
 
-종족(race), 속성(element), 성향(disposition), 능력치(stats)는 이미 확정된 값이다. 바꾸거나 모순되게 쓰지 말고 글에 녹여라.
+종족(race), 속성(element), 성향(disposition), 색감(palette), 고유 능력(ability), 능력치(stats)는 이미 확정된 값이다. 바꾸거나 모순되게 쓰지 말고 글에 녹여라.
 
 작성 기준
 - 이름(name)은 2~8자로 새로 짓는다. 기존 작품의 고유명사는 쓰지 않는다.
-- 외형(appearance)은 일러스트를 그릴 수 있도록 형체, 색, 장식을 구체적으로 2~3문장으로 쓴다. silhouette, presence를 반영한다.
-- 설정(backstory)은 realm, bond, stance를 담아 3~4문장으로 쓴다. 가장 높은 능력치가 드러나는 일화를 넣는다.
-- 럭키 아이템(lucky_item)은 일상에서 찾을 수 있는 물건 하나로 고른다.
+- 외형(appearance)은 일러스트를 그릴 수 있도록 형체, 색, 장식을 구체적으로 2~3문장으로 쓴다. silhouette, presence를 반영하고 색은 palette를 따른다.
+- 설정(backstory)은 realm, bond, stance를 담아 3~4문장으로 쓴다. crisis가 드러나는 일화에서 ability를 쓰는 장면을 넣는다.
+- 럭키 아이템(lucky_item)은 lucky_item_type에 해당하면서 일상에서 찾을 수 있는 물건 하나로 고른다.
 - 2027년 메시지(message_2027)는 wish를 담아 참가자에게 건네는 따뜻한 1~2문장으로 쓴다.
 
 지켜야 할 것
