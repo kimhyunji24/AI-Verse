@@ -1,7 +1,7 @@
 /**
  * 캐릭터 생성 API 클라이언트 (characterApi)
  *
- * 역할: 특징값과 응답을 백엔드 POST /api/character 로 보내고 결과를 받아온다. 요청·응답 타입과 설문 항목도 정의한다.
+ * 역할: 특징값과 응답을 백엔드 POST /api/character 로 보내고 결과를 받아온다. 포토카드 생성도 요청한다. 요청·응답 타입과 설문 항목도 정의한다.
  * 비고: 형식은 백엔드 schemas.py 와 맞춘다. 주소는 NEXT_PUBLIC_API_URL 로 바꿀 수 있다.
  *       설문 선택지 값을 바꾸면 백엔드 schemas.py 의 Answers 와 parameters.py 의 표도 함께 고친다.
  *
@@ -12,6 +12,7 @@
  *   - 2026-11-03 캐릭터 유형 문항 추가 (인외, 애니)
  *   - 2026-11-03 인외 선택지를 사물 머리 캐릭터로 변경
  *   - 2026-11-03 캐릭터 유형 이름을 오브젝트 헤드, 애니메이션 캐릭터로 변경
+ *   - 2026-11-22 포토카드 생성 요청(POST /api/photocard) 추가
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -143,27 +144,45 @@ export class CharacterApiError extends Error {
   }
 }
 
-export async function createCharacter(
-  features: FaceFeatures,
-  answers: Answers,
-): Promise<Character> {
+/** 백엔드가 만든 포토카드. 주소는 백엔드 기준 경로라 assetUrl 로 바꿔 쓴다. */
+export type Photocard = {
+  card_id: string;
+  illustration_url: string;
+  card_url: string;
+};
+
+export const assetUrl = (path: string) => `${API_URL}${path}`;
+
+async function post<T>(path: string, body: unknown, fallback: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/character`, {
+    response = await fetch(`${API_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ features, answers }),
+      body: JSON.stringify(body),
     });
   } catch {
     throw new CharacterApiError("서버에 연결하지 못했어요", true);
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => null);
+    const detail = (await response.json().catch(() => null))?.detail;
     throw new CharacterApiError(
-      body?.detail?.message ?? "캐릭터 생성에 실패했어요",
-      body?.detail?.retryable ?? false,
+      detail?.message ?? fallback,
+      detail?.retryable ?? false,
     );
   }
   return response.json();
+}
+
+export function createCharacter(
+  features: FaceFeatures,
+  answers: Answers,
+): Promise<Character> {
+  return post("/api/character", { features, answers }, "캐릭터 생성에 실패했어요");
+}
+
+/** 일러스트를 그리고 포토카드를 합성한다. 이미지 생성이라 수십 초 걸릴 수 있다. */
+export function createPhotocard(character: Character): Promise<Photocard> {
+  return post("/api/photocard", character, "포토카드를 만들지 못했어요");
 }

@@ -5,7 +5,8 @@
  *       위치 맞추기 → 버튼 → 3초 카운트다운 → 얼굴 측정 → 재료 투입(설문) → 버튼 꾹 누르기
  *       → 항아리 끓이기(캐릭터 생성) → 펑! → 포토카드 등장 → 버튼 → 카드가 아래로 내려감
  * 비고: 버튼은 블루투스 키보드의 Space, Enter 이다. (useArcadeButton)
- *       실제 프린터 출력은 아직 연결되어 있지 않다. 카드가 내려가는 연출까지만 동작한다.
+ *       캐릭터 글이 나오면 바로 카드를 보여주고, 그 사이 백엔드가 일러스트를 그려 포토카드를 합성한다.
+ *       실제 프린터 출력은 아직 연결되어 있지 않다. 포토카드는 백엔드에 파일로 저장되고, 카드가 내려가는 연출까지만 동작한다.
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
@@ -15,6 +16,7 @@
  *   - 2026-11-03 마녀 항아리 연출(재료 투입, 꾹 누르기, 끓이기, 펑, 카드 등장·하강)로 변경
  *   - 2026-11-03 재료 목록을 이모지 글자 대신 아이콘으로 표시
  *   - 2026-11-03 펑 터질 때 "나야, 부캐" 문구 표시
+ *   - 2026-11-22 캐릭터 생성 뒤 포토카드(일러스트 + 합성) 요청, 완성 전에는 카드 완성 버튼을 막음
  */
 
 "use client";
@@ -34,6 +36,8 @@ import {
   type Character,
   CharacterApiError,
   createCharacter,
+  createPhotocard,
+  type Photocard,
 } from "@/lib/characterApi";
 import {
   type Alignment,
@@ -105,6 +109,11 @@ export default function ObservatoryFlow() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [character, setCharacter] = useState<Character | null>(null);
   const [failure, setFailure] = useState<CharacterApiError | null>(null);
+  const [photocard, setPhotocard] = useState<Photocard | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [cardFailure, setCardFailure] = useState<CharacterApiError | null>(null);
+  // 다음 참가자로 넘어간 뒤 늦게 도착한 이전 참가자의 포토카드를 버리기 위한 번호
+  const cardRequestRef = useRef(0);
 
   const addIngredient = useCallback((ingredient: Ingredient) => {
     setIngredients((current) => [...current, ingredient]);
@@ -156,6 +165,25 @@ export default function ObservatoryFlow() {
     setStep("countdown");
   }, [step, alignment]);
 
+  const drawCard = useCallback(async (created: Character) => {
+    const request = ++cardRequestRef.current;
+    setDrawing(true);
+    setCardFailure(null);
+    try {
+      const card = await createPhotocard(created);
+      if (request === cardRequestRef.current) setPhotocard(card);
+    } catch (error) {
+      if (request !== cardRequestRef.current) return;
+      setCardFailure(
+        error instanceof CharacterApiError
+          ? error
+          : new CharacterApiError("포토카드를 만들지 못했어요", true),
+      );
+    } finally {
+      if (request === cardRequestRef.current) setDrawing(false);
+    }
+  }, []);
+
   const generate = useCallback(
     async (measured: FaceFeatures, answered: Answers) => {
       setStep("brewing");
@@ -170,6 +198,7 @@ export default function ObservatoryFlow() {
         setCharacter(created);
         setStep("burst");
         playPoof();
+        drawCard(created);
       } catch (error) {
         setFailure(
           error instanceof CharacterApiError
@@ -179,7 +208,7 @@ export default function ObservatoryFlow() {
         setStep("failed");
       }
     },
-    [],
+    [drawCard],
   );
 
   // 다음 참가자를 위해 이전 참가자의 데이터를 모두 지운다
@@ -190,6 +219,10 @@ export default function ObservatoryFlow() {
     setIngredients([]);
     setCharacter(null);
     setFailure(null);
+    cardRequestRef.current += 1;
+    setPhotocard(null);
+    setDrawing(false);
+    setCardFailure(null);
     setProgress(0);
     setHold(0);
     setStep("align");
@@ -212,11 +245,17 @@ export default function ObservatoryFlow() {
     if (step === "spell") setHold(0);
   }, [step]);
 
+  // 포토카드가 완성됐거나, 다시 그려도 소용없는 실패면 글 카드로라도 마무리한다
+  const pressCard = useCallback(() => {
+    if (photocard || (cardFailure && !cardFailure.retryable)) setStep("printing");
+    else if (cardFailure && character) drawCard(character);
+  }, [photocard, cardFailure, character, drawCard]);
+
   useArcadeButton({
     onPress: () => {
       if (step === "align") begin();
       else if (step === "spell") startHold();
-      else if (step === "card") setStep("printing");
+      else if (step === "card") pressCard();
       else if (step === "failed") {
         if (failure?.retryable && features && answers) generate(features, answers);
         else restart();
@@ -405,13 +444,34 @@ export default function ObservatoryFlow() {
 
       {(step === "card" || step === "printing") && character && (
         <>
-          <CharacterResult character={character} printing={step === "printing"} />
-          {step === "card" && (
-            <button
-              type="button"
-              onClick={() => setStep("printing")}
-              className={primaryButton}
-            >
+          <CharacterResult
+            character={character}
+            photocard={photocard}
+            drawing={drawing}
+            printing={step === "printing"}
+          />
+          {step === "card" && drawing && (
+            <p role="status">일러스트를 그리고 있어요. 잠시만 기다려 주세요</p>
+          )}
+          {step === "card" && cardFailure && (
+            <div className="flex flex-col items-center gap-3" role="alert">
+              <p>{cardFailure.message}</p>
+              <div className="flex gap-3">
+                <button type="button" onClick={pressCard} className={primaryButton}>
+                  {cardFailure.retryable ? "다시 그리기" : "이대로 완성하기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={restart}
+                  className="rounded-full border border-zinc-500 px-6 py-2"
+                >
+                  처음으로
+                </button>
+              </div>
+            </div>
+          )}
+          {step === "card" && photocard && (
+            <button type="button" onClick={pressCard} className={primaryButton}>
               버튼을 눌러 카드 완성하기
             </button>
           )}
