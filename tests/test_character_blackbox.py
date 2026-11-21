@@ -8,6 +8,7 @@
   - 2026-11-03 최초 작성
   - 2026-11-03 캐릭터 유형 추가, GPT 결과를 그대로 쓰는 동작으로 변경
   - 2026-11-03 인외 캐릭터가 머리가 사물인 캐릭터인지 확인 추가
+  - 2026-11-22 애니메이션 캐릭터의 화풍과 얼굴 생김새 확인 추가
 """
 
 import itertools
@@ -258,7 +259,8 @@ def test_instructions_explain_both_character_types(client, openai_server):
     instructions = openai_server.requests[0]["instructions"]
     assert "머리가 사물인 인외 캐릭터:" in instructions
     assert "촉수나 괴물로 만들지 않고" in instructions
-    assert "애니메이션 인물 캐릭터:" in instructions
+    assert "애니메이션 캐릭터:" in instructions
+    assert "기존 작품의 캐릭터와 구별되는 오리지널" in instructions
 
 
 def test_instructions_forbid_judging_the_participant(client, openai_server):
@@ -343,3 +345,39 @@ def test_missing_api_key_gives_clear_error(client, monkeypatch):
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
+
+
+# 애니메이션 캐릭터: 화풍과 얼굴 생김새
+
+
+def test_anime_gets_art_style_and_face_traits_nonhuman_does_not(client, openai_server):
+    anime = create(client, answers={"character_type": "anime"})["parameters"]
+    nonhuman = create(client, answers={"character_type": "nonhuman"})["parameters"]
+    assert anime["art_style"]
+    assert len(anime["face_traits"]) >= 3
+    assert nonhuman["art_style"] == "" and nonhuman["face_traits"] == []
+
+
+def test_answers_change_art_style(client, openai_server):
+    styles = {
+        create(client, answers={"character_type": "anime", "power": power})["parameters"]["art_style"]
+        for power in ANSWER_OPTIONS["power"]
+    }
+    # 얼굴형이 같으면 힘마다 다른 화풍이 나온다
+    assert len(styles) == len(ANSWER_OPTIONS["power"])
+
+
+def test_face_shape_changes_face_traits(client, openai_server):
+    wide = {**FEATURES, "face_aspect_ratio": 1.15, "mouth_width_ratio": 0.55}
+    long = {**FEATURES, "face_aspect_ratio": 1.50, "mouth_width_ratio": 0.30}
+    traits_wide = create(client, features=wide, answers={"character_type": "anime"})["parameters"]["face_traits"]
+    traits_long = create(client, features=long, answers={"character_type": "anime"})["parameters"]["face_traits"]
+    assert "가로로 넓고 둥근 얼굴형" in traits_wide and "입이 큰 편" in traits_wide
+    assert "세로로 갸름한 얼굴형" in traits_long and "입이 작은 편" in traits_long
+
+
+def test_face_traits_never_judge_appearance(client, openai_server):
+    for features in ({**FEATURES, name: low} for name, (low, _) in FEATURE_BOUNDS.items()):
+        traits = create(client, features=features, answers={"character_type": "anime"})["parameters"]["face_traits"]
+        for word in ("예쁜", "못생긴", "잘생긴", "매력", "아름다운", "추한"):
+            assert all(word not in trait for trait in traits)

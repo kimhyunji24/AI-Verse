@@ -7,6 +7,7 @@
 수정 이력:
   - 2026-11-22 최초 작성
   - 2026-11-22 요청 형식 {character, pose_skeleton} 반영, 포즈 뼈대 테스트 추가
+  - 2026-11-22 애니메이션 캐릭터 프롬프트에 화풍과 얼굴 생김새가 들어가는지 확인 추가
 """
 
 import base64
@@ -84,7 +85,7 @@ def test_prompt_uses_character_text_only(client, openai_server):
 
 @pytest.mark.parametrize(
     "character_type, expected",
-    [("nonhuman", "머리 자리에 사물"), ("anime", "애니메이션풍")],
+    [("nonhuman", "머리 자리에 사물"), ("anime", "기존 작품의 캐릭터와 구별되는 오리지널")],
 )
 def test_prompt_follows_character_type(client, openai_server, character_type, expected):
     photocard(client, make_character(client, character_type=character_type))
@@ -155,3 +156,12 @@ def test_invalid_pose_is_rejected_before_calling_ai(client, openai_server, pose)
     response = photocard(client, make_character(client), pose)
     assert response.status_code == 422
     assert image_requests(openai_server) == []
+
+
+def test_anime_prompt_has_art_style_and_face_traits(client, openai_server):
+    character = make_character(client, character_type="anime")
+    photocard(client, character)
+    [request] = image_requests(openai_server)
+    assert character["parameters"]["art_style"] in request["prompt"]
+    for trait in character["parameters"]["face_traits"]:
+        assert trait in request["prompt"]

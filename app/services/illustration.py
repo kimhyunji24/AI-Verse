@@ -10,6 +10,7 @@
   - 2026-11-22 최초 작성
   - 2026-11-22 풀아트 카드에 맞게 세로 2:3 구도로 변경, 위아래에 글자 자리를 비우도록 지시
   - 2026-11-22 포즈 뼈대 그림을 참고 이미지로 받아 참가자와 같은 자세로 그리도록 추가
+  - 2026-11-22 애니메이션 캐릭터는 화풍(art_style)과 얼굴 생김새(face_traits)를 프롬프트에 넣도록 변경
 """
 
 import base64
@@ -31,7 +32,8 @@ STYLES = {
         "머리 자리에 사물이 달려 있고 목 아래는 사람의 몸인 캐릭터. "
         "사물에 사람 얼굴(눈, 코, 입)을 그려 넣지 않는다. 귀엽고 세련된 판타지 일러스트."
     ),
-    "anime": "일본 애니메이션풍의 인물 캐릭터 일러스트. 선명한 선과 셀 채색.",
+    # 애니메이션은 룰이 고른 화풍(parameters.art_style)을 붙여 쓴다
+    "anime": "애니메이션 캐릭터 일러스트.",
 }
 
 
@@ -59,10 +61,22 @@ def build_prompt(character: CharacterResponse, *, with_pose: bool = False) -> st
         "anime",
     )
     style = STYLES[type_key]
+    anime_lines = []
+    if type_key == "anime":
+        style += f" 화풍: {parameters.art_style}."
+        anime_lines = [
+            "이 화풍의 특징은 참고만 하고, 기존 작품의 캐릭터와 구별되는 오리지널 캐릭터로 그린다.",
+            *(
+                [f"얼굴 생김새: {', '.join(parameters.face_traits)}. 이 생김새를 캐릭터 얼굴에 반영한다."]
+                if parameters.face_traits
+                else []
+            ),
+        ]
     return "\n".join(
         [
             "풀아트 홀로그램 트레이딩 카드의 전면 일러스트 한 장을 세로 구도로 그려라.",
             f"스타일: {style}",
+            *anime_lines,
             f"캐릭터: {character.race}, 속성은 {character.element}.",
             f"외형: {character.appearance}",
             f"색감: {character.palette}",

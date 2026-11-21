@@ -13,6 +13,7 @@
   - 2026-11-03 하이브리드로 변경: 값을 확정하는 대신 후보를 만들고 GPT 결정을 검증, 측정 항목 확대
   - 2026-11-03 애니 캐릭터 후보 추가, GPT 결과 재검증 제거
   - 2026-11-03 인외 후보를 머리가 사물인 캐릭터로 변경
+  - 2026-11-22 애니메이션 캐릭터에 화풍(유명 만화 화풍에서 뽑은 특징 텍스트)과 얼굴 생김새 문구 추가
 """
 
 from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
@@ -66,8 +67,45 @@ WISHES = {
 
 CHARACTER_TYPES = {
     "nonhuman": "머리가 사물인 인외 캐릭터",
-    "anime": "애니메이션 인물 캐릭터",
+    "anime": "애니메이션 캐릭터",
 }
+
+# 애니메이션 캐릭터의 화풍: 유명 만화·애니메이션 화풍에서 외형 특징만 글로 뽑았다. 작품 이름은 쓰지 않는다.
+ART_STYLES = (
+    "2등신의 작고 말랑한 동물 캐릭터. 동글동글한 몸, 짧은 팔다리, 작은 점 같은 눈, 분홍 볼터치, "
+    "굵고 부드러운 손그림 외곽선, 연한 파스텔 채색",
+    "소년 만화풍 주인공. 뾰족하게 솟은 머리카락, 크고 또렷한 눈매, 굵은 효과선과 역동적인 원근, 선명한 원색",
+    "극장판 판타지 애니메이션풍. 부드러운 수채화 배경, 자연스러운 비율의 인물, 따뜻한 빛과 바람에 날리는 머리카락",
+    "마법소녀·아이돌 애니메이션풍. 반짝이는 큰 눈, 리본과 프릴 장식, 별과 하트 효과, 화사한 파스텔 네온",
+    "둥근 마스코트 캐릭터풍. 커다랗고 동그란 머리와 작은 몸, 단순한 도형으로 된 이목구비, 작은 리본이나 모자 소품, "
+    "평면적인 단색 채색",
+    "서양 카툰풍. 굵고 균일한 검은 외곽선, 기하학 도형으로 단순화한 몸, 과장된 표정, 납작한 원색 채색",
+)
+# 화풍 고르기: 응답(갖고 싶은 힘) × 실루엣 단계 -> ART_STYLES 번호
+# 같은 실루엣 단계 안에서는 힘마다 화풍이 모두 다르도록 배치했다
+ART_STYLE_TABLE = {
+    "read_minds": (4, 2, 3),
+    "stop_time": (0, 4, 2),
+    "fly": (1, 3, 0),
+    "transform": (5, 0, 1),
+}
+
+# 애니메이션 캐릭터 얼굴에 옮길 생김새: 점수가 0.5에서 이만큼 벗어나면 (낮을 때, 높을 때) 문구를 쓴다.
+# 좋고 나쁨이 없는 생김새 묘사만 쓴다.
+FACE_TRAIT_THRESHOLD = 0.15
+FACE_TRAITS = {
+    "face_aspect_ratio": ("가로로 넓고 둥근 얼굴형", "세로로 갸름한 얼굴형"),
+    "eye_spacing_ratio": ("두 눈 사이가 가까운 편", "두 눈 사이가 먼 편"),
+    "inner_eye_gap_ratio": ("미간이 좁은 편", "미간이 넓은 편"),
+    "eye_position_ratio": ("눈이 얼굴 위쪽에 자리함", "눈이 얼굴 아래쪽에 자리함"),
+    "nose_length_ratio": ("코가 짧은 편", "코가 긴 편"),
+    "nose_width_ratio": ("코가 좁은 편", "코가 넓은 편"),
+    "mouth_width_ratio": ("입이 작은 편", "입이 큰 편"),
+    "lip_thickness_ratio": ("입술이 얇은 편", "입술이 도톰한 편"),
+    "jaw_width_ratio": ("턱선이 갸름한 편", "턱선이 넓은 편"),
+}
+# 두드러진 특징이 없을 때도 닮은 느낌이 나도록 최소한 이만큼은 고른다
+FACE_TRAIT_MIN = 3
 
 # 인외 캐릭터(머리가 사물, 몸은 사람)의 머리 후보: 응답(장소) × 실루엣 단계별 2개
 NONHUMAN_RACES = {
@@ -233,6 +271,17 @@ def _base_stats(features: FaceFeatures, answers: Answers, scores: dict[str, floa
     return Stats(**stats)
 
 
+def _face_traits(scores: dict[str, float]) -> list[str]:
+    """0.5에서 많이 벗어난 순서로 생김새 문구를 고른다."""
+    ranked = sorted(FACE_TRAITS, key=lambda name: abs(scores[name] - 0.5), reverse=True)
+    picked = [
+        name
+        for index, name in enumerate(ranked)
+        if index < FACE_TRAIT_MIN or abs(scores[name] - 0.5) >= FACE_TRAIT_THRESHOLD
+    ]
+    return [FACE_TRAITS[name][scores[name] >= 0.5] for name in picked]
+
+
 def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParameters:
     silhouette = _tier(features, "face_aspect_ratio")
     gaze = _tier(features, "eye_spacing_ratio")
@@ -245,6 +294,7 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
     near_silhouette = _nearest_other_tier(features, "face_aspect_ratio", silhouette)
     near_gaze = _nearest_other_tier(features, "eye_spacing_ratio", gaze)
     near_presence = _nearest_other_tier(features, "jaw_width_ratio", presence)
+    anime = answers.character_type == "anime"
 
     return CharacterParameters(
         face_scores=scores,
@@ -271,4 +321,6 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
             DISPOSITIONS[answers.companion][near_gaze],
         ],
         base_stats=_base_stats(features, answers, scores),
+        art_style=ART_STYLES[ART_STYLE_TABLE[answers.power][silhouette]] if anime else "",
+        face_traits=_face_traits(scores) if anime else [],
     )
