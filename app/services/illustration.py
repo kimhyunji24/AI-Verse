@@ -3,11 +3,13 @@
 
 역할: GPT가 쓴 캐릭터 외형 글을 프롬프트로 만들어 일러스트 PNG를 생성한다.
 비고: 참가자 얼굴 이미지나 측정값은 보내지 않는다. 캐릭터 글(외형, 종족, 색감, 배경)만 쓴다.
+      포즈 뼈대 그림(얼굴 없이 관절을 선으로 이은 그림)이 있으면 참고 이미지로 함께 보내 같은 자세로 그리게 한다.
       모델은 OPENAI_IMAGE_MODEL, 품질은 OPENAI_IMAGE_QUALITY 환경변수(.env)로 바꿀 수 있다.
 
 수정 이력:
   - 2026-11-22 최초 작성
   - 2026-11-22 풀아트 카드에 맞게 세로 2:3 구도로 변경, 위아래에 글자 자리를 비우도록 지시
+  - 2026-11-22 포즈 뼈대 그림을 참고 이미지로 받아 참가자와 같은 자세로 그리도록 추가
 """
 
 import base64
@@ -41,7 +43,15 @@ class IllustrationError(Exception):
         self.retryable = retryable
 
 
-def build_prompt(character: CharacterResponse) -> str:
+POSE_INSTRUCTIONS = (
+    "첨부한 그림은 참가자가 의자에 앉아 취한 상반신 자세를 흰 바탕에 막대 뼈대로 나타낸 것이다. "
+    "둥근 원은 머리, 선은 어깨·팔·손·몸통이다. 캐릭터가 이 자세를 그대로 따르게 그린다: "
+    "어깨 기울기, 양팔과 손의 높이와 방향, 고개 기울기를 맞춘다. 왼쪽과 오른쪽도 그림 그대로 둔다. "
+    "뼈대의 선, 점, 흰 바탕은 결과 그림에 남기지 않는다."
+)
+
+
+def build_prompt(character: CharacterResponse, *, with_pose: bool = False) -> str:
     parameters = character.parameters
     # parameters.character_type 에는 키(nonhuman)가 아니라 설명 문구가 들어 있다
     type_key = next(
@@ -59,6 +69,7 @@ def build_prompt(character: CharacterResponse) -> str:
             f"배경: {parameters.realm}을 은은하게 표현한다.",
             "구도: 캐릭터 한 명이 화면 가운데에서 역동적인 자세로 선다. 머리는 위에서 20% 아래에 오게 하고, "
             "화면 아래 3분의 1은 캐릭터의 다리와 배경으로 채운다(나중에 글자 패널이 덮는다).",
+            *([f"자세: {POSE_INSTRUCTIONS}"] if with_pose else []),
             "연출: 화려한 빛, 반짝이는 입자, 배경과 어우러지는 극적인 조명.",
             "글자, 숫자, 로고, 워터마크, 카드 테두리를 넣지 않는다.",
             "모든 연령이 보는 행사용이므로 잔인하거나 선정적인 요소를 넣지 않는다.",
@@ -71,16 +82,22 @@ def _build_client() -> openai.OpenAI:
     return openai.OpenAI(timeout=120.0, max_retries=1)
 
 
-def generate_illustration(character: CharacterResponse) -> bytes:
+def generate_illustration(character: CharacterResponse, pose_png: bytes | None = None) -> bytes:
+    options = {
+        "model": os.getenv("OPENAI_IMAGE_MODEL", DEFAULT_MODEL),
+        "prompt": build_prompt(character, with_pose=pose_png is not None),
+        "size": SIZE,
+        "quality": os.getenv("OPENAI_IMAGE_QUALITY", DEFAULT_QUALITY),
+        "output_format": "png",
+        "n": 1,
+    }
     try:
-        response = _build_client().images.generate(
-            model=os.getenv("OPENAI_IMAGE_MODEL", DEFAULT_MODEL),
-            prompt=build_prompt(character),
-            size=SIZE,
-            quality=os.getenv("OPENAI_IMAGE_QUALITY", DEFAULT_QUALITY),
-            output_format="png",
-            n=1,
-        )
+        client = _build_client()
+        if pose_png is None:
+            response = client.images.generate(**options)
+        else:
+            # 참고 이미지가 있으면 편집 API로 보낸다. 뼈대는 자세 참고용일 뿐 그대로 남기지 않는다.
+            response = client.images.edit(image=("pose.png", pose_png, "image/png"), **options)
     except openai.AuthenticationError as error:
         raise IllustrationError("API 키를 확인해 주세요", retryable=False) from error
     except openai.BadRequestError as error:

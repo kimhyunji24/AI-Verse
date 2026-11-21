@@ -8,9 +8,12 @@
 수정 이력:
   - 2026-11-03 최초 작성
   - 2026-11-22 이미지 생성 요청 응답과 포토카드 저장 폴더(임시 폴더) 추가
+  - 2026-11-22 이미지 편집 요청(multipart, 포즈 참고 이미지)도 기록하도록 추가
 """
 
 import base64
+import email.parser
+import email.policy
 import io
 import json
 import os
@@ -36,6 +39,19 @@ def _png(size=(64, 64), color=(120, 80, 200)) -> str:
 
 
 FAKE_IMAGE_B64 = _png()
+
+
+def _parse_multipart(content_type: str, raw: bytes) -> dict:
+    """이미지 편집 요청(multipart)에서 글자 칸은 문자열로, 파일 칸은 바이트로 꺼낸다."""
+    message = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(
+        f"Content-Type: {content_type}\r\n\r\n".encode() + raw
+    )
+    fields = {}
+    for part in message.iter_parts():
+        name = part.get_param("name", header="content-disposition")
+        payload = part.get_payload(decode=True)
+        fields[name] = payload if part.get_filename() else payload.decode()
+    return fields
 
 STORY = {
     "reason": "달빛 조각이 먼저 끓어올랐다.",
@@ -104,10 +120,14 @@ def openai_server(monkeypatch):
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
-            request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            raw = self.rfile.read(int(self.headers["Content-Length"]))
+            if self.headers["Content-Type"].startswith("multipart/form-data"):
+                request = _parse_multipart(self.headers["Content-Type"], raw)
+            else:
+                request = json.loads(raw)
             request["_path"] = self.path
             fake.requests.append(request)
-            if fake.status == 200 and self.path.endswith("/images/generations"):
+            if fake.status == 200 and "/images/" in self.path:
                 payload = {"created": 0, "data": [{"b64_json": FAKE_IMAGE_B64}]}
             elif fake.status == 200:
                 payload = fake.body(request)
