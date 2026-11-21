@@ -2,16 +2,23 @@
  * 캐릭터 포토카드 (CharacterResult)
  *
  * 역할: 생성된 캐릭터를 세로 포토카드(100×148mm 비율) 모양으로 보여준다.
- * 비고: 일러스트 자리는 아직 비어 있다. 실제 출력용 이미지는 백엔드에서 합성할 예정이며 이 화면은 미리보기다.
+ * 비고: 백엔드가 포토카드(일러스트 포함 PNG)를 다 만들면 그 이미지를 그대로 보여준다.
+ *       만드는 동안에는 글만 담긴 미리보기 카드를 보여주고 일러스트 자리에 진행 문구를 띄운다.
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 포토카드 디자인으로 변경, 등장·출력 애니메이션 추가
  *   - 2026-11-03 고유 능력 표시 추가
  *   - 2026-11-03 GPT의 선택 이유(묘약 기록) 표시 추가
+ *   - 2026-11-22 완성된 포토카드 이미지 표시와 일러스트 생성 중 문구 추가
  */
 
-import type { Character, Stats } from "@/lib/characterApi";
+import {
+  assetUrl,
+  type Character,
+  type Photocard,
+  type Stats,
+} from "@/lib/characterApi";
 
 const STAT_LABELS: Record<keyof Stats, string> = {
   insight: "통찰",
@@ -24,17 +31,34 @@ const STAT_LABELS: Record<keyof Stats, string> = {
 
 export default function CharacterResult({
   character,
+  photocard,
+  drawing,
   printing,
 }: {
   character: Character;
+  photocard: Photocard | null;
+  drawing: boolean;
   printing: boolean;
 }) {
+  const animation = printing ? "anim-card-print" : "anim-card-appear";
+
+  if (photocard) {
+    return (
+      // 백엔드가 만든 파일을 그대로 보여준다. 크기가 고정이라 next/image 최적화가 필요 없다.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        data-testid="photocard"
+        src={assetUrl(photocard.card_url)}
+        alt={`${character.name} 포토카드`}
+        className={`aspect-[100/148] w-[min(92vw,26rem)] rounded-2xl shadow-[0_0_60px_rgba(168,85,247,0.45)] ${animation}`}
+      />
+    );
+  }
+
   return (
     <article
       data-testid="character"
-      className={`flex aspect-[100/148] w-[min(92vw,26rem)] flex-col gap-2.5 rounded-2xl border-2 border-amber-300/70 bg-gradient-to-b from-indigo-950 via-purple-950 to-black p-4 text-sm shadow-[0_0_60px_rgba(168,85,247,0.45)] ${
-        printing ? "anim-card-print" : "anim-card-appear"
-      }`}
+      className={`flex aspect-[100/148] w-[min(92vw,26rem)] flex-col gap-2.5 rounded-2xl border-2 border-amber-300/70 bg-gradient-to-b from-indigo-950 via-purple-950 to-black p-4 text-sm shadow-[0_0_60px_rgba(168,85,247,0.45)] ${animation}`}
     >
       <header className="text-center">
         <p className="text-xs text-amber-200/90">
@@ -43,8 +67,13 @@ export default function CharacterResult({
         <h2 className="font-display text-2xl text-amber-100">{character.name}</h2>
       </header>
 
-      {/* 일러스트 생성 기능이 붙으면 이미지로 교체한다 */}
-      <div className="flex min-h-28 flex-1 items-center justify-center rounded-lg border border-amber-300/30 bg-black/40 p-3 text-center text-xs leading-relaxed text-purple-100/80">
+      {/* 포토카드가 완성되면 이 카드 전체가 완성 이미지로 바뀐다 */}
+      <div className="flex min-h-28 flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-black/40 p-3 text-center text-xs leading-relaxed text-purple-100/80">
+        {drawing && (
+          <p role="status" className="animate-pulse text-sm text-amber-200">
+            일러스트를 그리는 중…
+          </p>
+        )}
         {character.appearance}
       </div>
 
