@@ -2,7 +2,7 @@
  * 체험 흐름 (ObservatoryFlow)
  *
  * 역할: 마녀의 묘약 콘셉트로 전체 체험을 진행한다.
- *       위치 맞추기 → 버튼 → 3초 카운트다운 → 얼굴 측정 → 재료 투입(설문) → 버튼 꾹 누르기
+ *       위치 맞추기 → 버튼 → 3초 카운트다운 → 얼굴 측정 → 포즈 잡기 → 재료 투입(설문) → 버튼 꾹 누르기
  *       → 항아리 끓이기(캐릭터 생성) → 펑! → 포토카드 등장 → 버튼 → 카드가 아래로 내려감
  * 비고: 버튼은 블루투스 키보드의 Space, Enter 이다. (useArcadeButton)
  *       캐릭터 글이 나오면 바로 카드를 보여주고, 그 사이 백엔드가 일러스트를 그려 포토카드를 합성한다.
@@ -17,6 +17,7 @@
  *   - 2026-11-03 재료 목록을 이모지 글자 대신 아이콘으로 표시
  *   - 2026-11-03 펑 터질 때 "나야, 부캐" 문구 표시
  *   - 2026-11-22 캐릭터 생성 뒤 포토카드(일러스트 + 합성) 요청, 완성 전에는 카드 완성 버튼을 막음
+ *   - 2026-11-22 얼굴 측정 뒤 포즈 잡기 단계 추가, 뼈대 그림을 포토카드 요청에 함께 보냄
  */
 
 "use client";
@@ -25,11 +26,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Cauldron, { type CauldronMood } from "@/components/Cauldron";
 import CharacterResult from "@/components/CharacterResult";
 import LandmarkOverlay, { type OverlayHandle } from "@/components/LandmarkOverlay";
+import PoseOverlay, { type PoseOverlayHandle } from "@/components/PoseOverlay";
 import SurveyStep from "@/components/SurveyStep";
 import TerminalLoading from "@/components/TerminalLoading";
 import WebcamView from "@/components/WebcamView";
 import { useArcadeButton } from "@/hooks/useArcadeButton";
 import { useFaceLandmarker } from "@/hooks/useFaceLandmarker";
+import { usePoseLandmarker } from "@/hooks/usePoseLandmarker";
 import { useWebcam } from "@/hooks/useWebcam";
 import {
   type Answers,
@@ -51,12 +54,18 @@ import {
   faceIngredients,
   type Ingredient,
 } from "@/lib/ingredients";
+import {
+  isUsablePose,
+  type PoseLandmark,
+  renderSkeletonPng,
+} from "@/lib/poseSkeleton";
 import { playPlop, playPoof } from "@/lib/sound";
 
 type Step =
   | "align"
   | "countdown"
   | "scan"
+  | "pose"
   | "survey"
   | "spell"
   | "brewing"
@@ -69,6 +78,10 @@ const COUNTDOWN_SECONDS = 3;
 const SCAN_MS = 2000;
 // 프레임이 너무 적으면 평균이 흔들리므로 시간이 지나도 이만큼은 모은다
 const SCAN_MIN_SAMPLES = 10;
+// 포즈를 잡을 시간. 끝나는 순간의 자세를 찍는다.
+const POSE_SECONDS = 5;
+// 상반신이 안 잡히면 다시 세는 횟수. 넘으면 포즈 없이 진행한다.
+const POSE_ATTEMPTS = 2;
 const SPELL_HOLD_MS = 1500;
 // 응답이 빨라도 끓는 연출을 볼 수 있도록 보장하는 최소 시간
 const BREW_MIN_MS = 3000;
@@ -93,6 +106,8 @@ export default function ObservatoryFlow() {
   const webcam = useWebcam();
   const { start: startWebcam } = webcam;
   const overlayRef = useRef<OverlayHandle>(null);
+  const poseOverlayRef = useRef<PoseOverlayHandle>(null);
+  const latestPoseRef = useRef<{ pose: PoseLandmark[]; aspect: number } | null>(null);
   const samplesRef = useRef<FaceFeatures[]>([]);
   const scanStartRef = useRef(0);
   const holdFrameRef = useRef(0);
@@ -102,6 +117,8 @@ export default function ObservatoryFlow() {
   const [step, setStep] = useState<Step>("align");
   const [alignment, setAlignment] = useState<Alignment>("no_face");
   const [count, setCount] = useState(COUNTDOWN_SECONDS);
+  const [poseCount, setPoseCount] = useState(POSE_SECONDS);
+  const [poseAttempt, setPoseAttempt] = useState(0);
   const [progress, setProgress] = useState(0);
   const [hold, setHold] = useState(0);
   const [features, setFeatures] = useState<FaceFeatures | null>(null);
@@ -112,6 +129,8 @@ export default function ObservatoryFlow() {
   const [photocard, setPhotocard] = useState<Photocard | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [cardFailure, setCardFailure] = useState<CharacterApiError | null>(null);
+  // 찍은 포즈 뼈대 그림. 화면에 그리지 않고 포토카드 요청에만 쓴다.
+  const poseSkeletonRef = useRef<string | null>(null);
   // 다음 참가자로 넘어간 뒤 늦게 도착한 이전 참가자의 포토카드를 버리기 위한 번호
   const cardRequestRef = useRef(0);
 
@@ -142,19 +161,42 @@ export default function ObservatoryFlow() {
       setProgress(Math.min(elapsed / SCAN_MS, 1));
       if (elapsed >= SCAN_MS && samplesRef.current.length >= SCAN_MIN_SAMPLES) {
         scanFinishedRef.current = true;
-        const measured = averageFeatures(samplesRef.current);
-        setFeatures(measured);
-        setStep("survey");
-        // 측정값이 재료로 변해 하나씩 항아리에 빠진다
-        faceIngredients(measured).forEach((ingredient, index) => {
-          setTimeout(() => addIngredient(ingredient), index * INGREDIENT_GAP_MS);
-        });
+        setFeatures(averageFeatures(samplesRef.current));
+        latestPoseRef.current = null;
+        setPoseCount(POSE_SECONDS);
+        setPoseAttempt(0);
+        setStep("pose");
       }
     },
-    [step, addIngredient],
+    [step],
   );
 
   const landmarkerStatus = useFaceLandmarker(webcam.videoRef, handleFrame);
+
+  const handlePose = useCallback(
+    (pose: PoseLandmark[] | undefined, video: HTMLVideoElement) => {
+      poseOverlayRef.current?.draw(pose, video);
+      if (isUsablePose(pose)) {
+        latestPoseRef.current = { pose, aspect: video.videoWidth / video.videoHeight };
+      }
+    },
+    [],
+  );
+  const poseStatus = usePoseLandmarker(webcam.videoRef, step === "pose", handlePose);
+
+  // 포즈를 찍은 뒤(또는 포즈 없이) 설문으로 넘어간다
+  const finishPose = useCallback(
+    (skeleton: string | null) => {
+      poseSkeletonRef.current = skeleton;
+      setStep("survey");
+      if (!features) return;
+      // 측정값이 재료로 변해 하나씩 항아리에 빠진다
+      faceIngredients(features).forEach((ingredient, index) => {
+        setTimeout(() => addIngredient(ingredient), index * INGREDIENT_GAP_MS);
+      });
+    },
+    [features, addIngredient],
+  );
 
   const begin = useCallback(() => {
     if (step !== "align" || alignment !== "ready") return;
@@ -170,7 +212,7 @@ export default function ObservatoryFlow() {
     setDrawing(true);
     setCardFailure(null);
     try {
-      const card = await createPhotocard(created);
+      const card = await createPhotocard(created, poseSkeletonRef.current);
       if (request === cardRequestRef.current) setPhotocard(card);
     } catch (error) {
       if (request !== cardRequestRef.current) return;
@@ -219,6 +261,8 @@ export default function ObservatoryFlow() {
     setIngredients([]);
     setCharacter(null);
     setFailure(null);
+    latestPoseRef.current = null;
+    poseSkeletonRef.current = null;
     cardRequestRef.current += 1;
     setPhotocard(null);
     setDrawing(false);
@@ -278,6 +322,32 @@ export default function ObservatoryFlow() {
   }, [step, count]);
 
   useEffect(() => {
+    if (step !== "pose" || poseStatus === "loading") return;
+    // 포즈 모델을 못 쓰면 기다리지 않고 포즈 없이 진행한다
+    const failed = poseStatus === "error";
+    const timer = setTimeout(() => {
+      if (failed) {
+        finishPose(null);
+        return;
+      }
+      if (poseCount > 1) {
+        setPoseCount(poseCount - 1);
+        return;
+      }
+      const captured = latestPoseRef.current;
+      if (captured) {
+        finishPose(renderSkeletonPng(captured.pose, captured.aspect));
+      } else if (poseAttempt + 1 < POSE_ATTEMPTS) {
+        setPoseAttempt(poseAttempt + 1);
+        setPoseCount(POSE_SECONDS);
+      } else {
+        finishPose(null);
+      }
+    }, failed ? 0 : 1000);
+    return () => clearTimeout(timer);
+  }, [step, poseStatus, poseCount, poseAttempt, finishPose]);
+
+  useEffect(() => {
     if (step === "burst") {
       const timer = setTimeout(() => setStep("card"), BURST_MS);
       return () => clearTimeout(timer);
@@ -288,7 +358,8 @@ export default function ObservatoryFlow() {
     }
   }, [step, restart]);
 
-  const showCamera = step === "align" || step === "countdown" || step === "scan";
+  const showCamera =
+    step === "align" || step === "countdown" || step === "scan" || step === "pose";
   const showCauldron =
     step === "survey" || step === "spell" || step === "brewing" || step === "failed";
   const mood: CauldronMood =
@@ -300,6 +371,12 @@ export default function ObservatoryFlow() {
       <div className={showCamera ? "w-full max-w-3xl" : "hidden"}>
         <WebcamView webcam={webcam}>
           <LandmarkOverlay ref={overlayRef} />
+          {step === "pose" && <PoseOverlay ref={poseOverlayRef} />}
+          {step === "pose" && poseStatus === "ready" && (
+            <div className="font-display absolute top-4 right-6 text-7xl text-emerald-200 drop-shadow-lg">
+              {poseCount}
+            </div>
+          )}
           {step === "countdown" && (
             <div className="font-display absolute inset-0 flex items-center justify-center text-8xl text-emerald-200">
               {count}
@@ -336,6 +413,18 @@ export default function ObservatoryFlow() {
         </div>
       )}
       {step === "scan" && <p role="status">얼굴을 묘약 재료로 바꾸고 있어요</p>}
+      {step === "pose" && (
+        <div className="flex flex-col items-center gap-1 text-center" role="status">
+          <p className="font-display text-2xl text-emerald-200">
+            캐릭터가 따라 할 포즈를 잡아 주세요!
+          </p>
+          <p>
+            {poseAttempt > 0
+              ? "어깨와 팔이 화면에 보이게 조금 뒤로 앉아 주세요"
+              : "손과 팔을 자유롭게 움직여 보세요. 숫자가 끝나면 찰칵!"}
+          </p>
+        </div>
+      )}
 
       {showCauldron && (
         <div className="grid w-full items-center gap-6 md:grid-cols-2">
