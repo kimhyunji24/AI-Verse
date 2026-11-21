@@ -9,11 +9,15 @@
   - 2026-11-03 캐릭터 유형 추가, GPT 결과를 그대로 쓰는 동작으로 변경
   - 2026-11-03 인외 캐릭터가 머리가 사물인 캐릭터인지 확인 추가
   - 2026-11-22 애니메이션 캐릭터의 화풍과 얼굴 생김새 확인 추가
+  - 2026-11-22 참고 캐릭터에서 화풍을 뽑는 단계 확인 추가 (대체 화풍, 이름 노출 방지)
 """
 
 import itertools
+import json
 
 import pytest
+
+from tests.conftest import STYLE_TEXT
 
 FEATURES = {
     "face_aspect_ratio": 1.3317,
@@ -358,13 +362,39 @@ def test_anime_gets_art_style_and_face_traits_nonhuman_does_not(client, openai_s
     assert nonhuman["art_style"] == "" and nonhuman["face_traits"] == []
 
 
-def test_answers_change_art_style(client, openai_server):
-    styles = {
-        create(client, answers={"character_type": "anime", "power": power})["parameters"]["art_style"]
-        for power in ANSWER_OPTIONS["power"]
-    }
-    # 얼굴형이 같으면 힘마다 다른 화풍이 나온다
-    assert len(styles) == len(ANSWER_OPTIONS["power"])
+def test_answers_change_art_reference(client, openai_server):
+    for power in ANSWER_OPTIONS["power"]:
+        create(client, answers={"character_type": "anime", "power": power})
+    references = {request["input"] for request in openai_server.style_requests}
+    # 얼굴형이 같으면 힘마다 다른 참고 캐릭터에서 화풍을 뽑는다
+    assert len(references) == len(ANSWER_OPTIONS["power"])
+
+
+def test_art_style_is_extracted_for_anime_only(client, openai_server):
+    create(client, answers={"character_type": "nonhuman"})
+    assert openai_server.style_requests == []
+    anime = create(client, answers={"character_type": "anime"})
+    [style_request] = openai_server.style_requests
+    assert anime["parameters"]["art_style"] == STYLE_TEXT
+    # 뽑은 화풍이 캐릭터 결정 요청에도 들어간다
+    assert STYLE_TEXT in openai_server.requests[-1]["input"]
+    # 참고 캐릭터 이름은 화풍 추출 요청에만 쓰고 응답에는 나오지 않는다
+    assert style_request["input"] not in json.dumps(anime, ensure_ascii=False)
+
+
+def test_failed_style_extraction_falls_back_to_preset(client, openai_server):
+    openai_server.style_status = 500
+    anime = create(client, answers={"character_type": "anime"})
+    assert anime["parameters"]["art_style"]
+    assert anime["parameters"]["art_style"] != STYLE_TEXT
+
+
+def test_style_text_with_reference_name_is_discarded(client, openai_server):
+    create(client, answers={"character_type": "anime"})
+    reference = openai_server.style_requests[0]["input"]
+    openai_server.style_text = f"{reference.split()[-1]}처럼 그린다."
+    anime = create(client, answers={"character_type": "anime"})
+    assert reference.split()[-1] not in anime["parameters"]["art_style"]
 
 
 def test_face_shape_changes_face_traits(client, openai_server):

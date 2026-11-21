@@ -14,6 +14,7 @@
   - 2026-11-03 애니 캐릭터 후보 추가, GPT 결과 재검증 제거
   - 2026-11-03 인외 후보를 머리가 사물인 캐릭터로 변경
   - 2026-11-22 애니메이션 캐릭터에 화풍(유명 만화 화풍에서 뽑은 특징 텍스트)과 얼굴 생김새 문구 추가
+  - 2026-11-22 참고 캐릭터 목록 추가: 화풍은 참가자마다 GPT가 참고 캐릭터에서 뽑고, 아래 화풍 글은 실패 시 대체용으로 사용
 """
 
 from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
@@ -70,7 +71,18 @@ CHARACTER_TYPES = {
     "anime": "애니메이션 캐릭터",
 }
 
-# 애니메이션 캐릭터의 화풍: 유명 만화·애니메이션 화풍에서 외형 특징만 글로 뽑았다. 작품 이름은 쓰지 않는다.
+# 애니메이션 캐릭터의 화풍을 뽑을 참고 캐릭터. 이름은 화풍 추출(services/art_style.py)에만 쓰고,
+# 응답·카드·이미지 프롬프트에는 넣지 않는다. 순서는 아래 ART_STYLES(대체용 화풍 글)와 맞춘다.
+ART_REFERENCES = (
+    "먼작귀(치이카와)의 치이카와",
+    "원피스의 몽키 D. 루피",
+    "센과 치히로의 행방불명의 치히로",
+    "미소녀전사 세일러문의 세일러문",
+    "산리오의 마이멜로디",
+    "네모바지 스폰지밥의 스폰지밥",
+)
+
+# 대체용 화풍 글: 화풍 추출이 실패하면 쓴다. 위 참고 캐릭터의 화풍을 미리 글로 뽑아 둔 것이며 작품 이름은 쓰지 않는다.
 ART_STYLES = (
     "2등신의 작고 말랑한 동물 캐릭터. 동글동글한 몸, 짧은 팔다리, 작은 점 같은 눈, 분홍 볼터치, "
     "굵고 부드러운 손그림 외곽선, 연한 파스텔 채색",
@@ -81,7 +93,7 @@ ART_STYLES = (
     "평면적인 단색 채색",
     "서양 카툰풍. 굵고 균일한 검은 외곽선, 기하학 도형으로 단순화한 몸, 과장된 표정, 납작한 원색 채색",
 )
-# 화풍 고르기: 응답(갖고 싶은 힘) × 실루엣 단계 -> ART_STYLES 번호
+# 화풍 고르기: 응답(갖고 싶은 힘) × 실루엣 단계 -> ART_REFERENCES / ART_STYLES 번호
 # 같은 실루엣 단계 안에서는 힘마다 화풍이 모두 다르도록 배치했다
 ART_STYLE_TABLE = {
     "read_minds": (4, 2, 3),
@@ -269,6 +281,13 @@ def _base_stats(features: FaceFeatures, answers: Answers, scores: dict[str, floa
             lowest = min(STAT_FIELDS, key=lambda other: stats[other])
             stats[lowest] += excess
     return Stats(**stats)
+
+
+def art_reference(features: FaceFeatures, answers: Answers) -> str | None:
+    """애니메이션 캐릭터면 화풍을 뽑을 참고 캐릭터 이름을, 아니면 None을 돌려준다."""
+    if answers.character_type != "anime":
+        return None
+    return ART_REFERENCES[ART_STYLE_TABLE[answers.power][_tier(features, "face_aspect_ratio")]]
 
 
 def _face_traits(scores: dict[str, float]) -> list[str]:
