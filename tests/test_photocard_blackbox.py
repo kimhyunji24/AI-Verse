@@ -8,6 +8,7 @@
   - 2026-11-22 최초 작성
   - 2026-11-22 요청 형식 {character, pose_skeleton} 반영, 포즈 뼈대 테스트 추가
   - 2026-11-22 애니메이션 캐릭터 프롬프트에 화풍과 얼굴 생김새가 들어가는지 확인 추가
+  - 2026-11-22 생김새 특징이 프롬프트에 들어가는지 확인 추가
 """
 
 import base64
@@ -165,3 +166,6 @@ def test_anime_prompt_has_art_style_and_face_traits(client, openai_server):
     assert character["parameters"]["art_style"] in request["prompt"]
     for trait in character["parameters"]["face_traits"]:
         assert trait in request["prompt"]
+    for feature in character["parameters"]["art_features"]:
+        assert feature in request["prompt"]
+    assert character["parameters"]["art_features"]

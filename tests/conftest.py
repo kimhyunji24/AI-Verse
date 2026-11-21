@@ -10,6 +10,7 @@
   - 2026-11-22 이미지 생성 요청 응답과 포토카드 저장 폴더(임시 폴더) 추가
   - 2026-11-22 이미지 편집 요청(multipart, 포즈 참고 이미지)도 기록하도록 추가
   - 2026-11-22 화풍 추출 요청에 응답하고, 화풍 추출만 실패시키는 설정 추가
+  - 2026-11-22 화풍 추출 응답을 화풍 + 생김새 특징(JSON)으로 변경
 """
 
 import base64
@@ -65,6 +66,7 @@ STORY = {
 
 
 STYLE_TEXT = "굵고 부드러운 손그림 선과 연한 파스텔 채색, 2등신의 동글동글한 비율로 그린다."
+STYLE_FEATURES = ["서로 멀찍이 떨어진 작은 점 같은 눈", "머리 위에 둥글게 솟은 작은 귀"]
 STYLE_MARKER = "애니메이션 아트 디렉터"
 
 
@@ -85,6 +87,7 @@ class FakeOpenAI:
         # 화풍 추출 요청만 따로 바꾼다: 실패 상태 코드 또는 돌려줄 글
         self.style_status = 200
         self.style_text = STYLE_TEXT
+        self.style_features = list(STYLE_FEATURES)
 
     @staticmethod
     def first_candidates(parameters):
@@ -119,7 +122,13 @@ class FakeOpenAI:
 
     def body(self, request):
         if is_style_request(request):
-            return self.text_body(request, self.style_text)
+            return self.text_body(
+                request,
+                json.dumps(
+                    {"art_style": self.style_text, "features": self.style_features},
+                    ensure_ascii=False,
+                ),
+            )
         content = (
             {"type": "refusal", "refusal": "거절"}
             if self.refuse

@@ -11,6 +11,7 @@
   - 2026-11-22 풀아트 카드에 맞게 세로 2:3 구도로 변경, 위아래에 글자 자리를 비우도록 지시
   - 2026-11-22 포즈 뼈대 그림을 참고 이미지로 받아 참가자와 같은 자세로 그리도록 추가
   - 2026-11-22 애니메이션 캐릭터는 화풍(art_style)과 얼굴 생김새(face_traits)를 프롬프트에 넣도록 변경
+  - 2026-11-22 참가자 얼굴이 반영된 생김새 특징(art_features)을 프롬프트에 추가
 """
 
 import base64
@@ -66,6 +67,11 @@ def build_prompt(character: CharacterResponse, *, with_pose: bool = False) -> st
         style += f" 화풍: {parameters.art_style}."
         anime_lines = [
             "이 화풍의 특징은 참고만 하고, 기존 작품의 캐릭터와 구별되는 오리지널 캐릭터로 그린다.",
+            *(
+                [f"생김새 특징: {' / '.join(parameters.art_features)}."]
+                if parameters.art_features
+                else []
+            ),
             *(
                 [f"얼굴 생김새: {', '.join(parameters.face_traits)}. 이 생김새를 캐릭터 얼굴에 반영한다."]
                 if parameters.face_traits
