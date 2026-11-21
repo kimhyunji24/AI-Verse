@@ -111,3 +111,51 @@ front(`feat/front`)와 back(`feat/back`) 사이의 데이터 형식입니다. �
 | 503 | 연결 오류, 요청 한도 초과, 거절, 생성 미완료, 형식이 맞지 않는 응답 | `true` |
 
 오류 본문: `{ "detail": { "message": "화면에 보여줄 문구", "retryable": true } }`
+
+## POST /api/photocard
+
+`POST /api/character` 응답을 **그대로** 보내면 일러스트를 그리고 포토카드 PNG를 합성해 저장합니다. 이미지 생성이라 수십 초 걸릴 수 있습니다.
+
+| 단계 | 담당 | 결과 |
+| --- | --- | --- |
+| 일러스트 | GPT Image (`app/services/illustration.py`) | 1024×1536 세로 PNG. 캐릭터 글(외형, 종족, 속성, 색감, 배경)만 프롬프트로 씁니다 |
+| 합성 | Pillow (`app/services/photocard.py`) | 100×148mm(300dpi, 1181×1748) 풀아트 홀로그램 카드 PNG |
+
+- 참가자 얼굴 이미지와 측정값은 이미지 생성 요청에 넣지 않습니다.
+- 카드 바탕색은 속성(`element`)으로, 등급 별(1~3개)은 가장 높은 능력치로 정합니다.
+- 파일은 백엔드의 `CARD_OUTPUT_DIR`(기본 `output/cards`)에 `<card_id>/card.png`, `illustration.png`, `character.json`으로 저장합니다.
+
+### 요청
+
+```json
+{
+  "character": { "...": "POST /api/character 응답 본문 전체" },
+  "pose_skeleton": "data:image/png;base64,iVBORw0KGgo..."
+}
+```
+
+- `pose_skeleton`(선택): 포즈 단계에서 찍은 상반신 뼈대 PNG(512×768, 흰 바탕). `data:` 접두어는 있어도 없어도 됩니다.
+  - 얼굴이 없는 그림입니다. 머리는 빈 원, 팔은 좌우를 다른 색 선으로 그립니다. 화면과 같은 거울 모드 기준입니다.
+  - 있으면 이미지 편집 API에 참고 이미지로 보내 캐릭터가 같은 자세를 취하게 하고, 카드 폴더에 `pose.png`로 함께 저장합니다.
+  - 없거나 `null`이면 자유 자세로 그립니다.
+  - PNG가 아니거나, 읽을 수 없거나, 한 변이 2048px보다 크면 AI를 호출하지 않고 422로 거절합니다.
+
+### 응답 (200)
+
+```json
+{
+  "card_id": "6ccf295638dd425d8227f13d889139f6",
+  "illustration_url": "/cards/6ccf295638dd425d8227f13d889139f6/illustration.png",
+  "card_url": "/cards/6ccf295638dd425d8227f13d889139f6/card.png"
+}
+```
+
+주소는 백엔드 기준 경로입니다. 프론트는 앞에 `NEXT_PUBLIC_API_URL`을 붙여 씁니다.
+
+### 오류
+
+| 상태 | 뜻 | `detail.retryable` |
+| --- | --- | --- |
+| 422 | 캐릭터 정보가 빠졌거나 형식이 틀림, 포즈 그림이 올바르지 않음 | - |
+| 500 | API 키 오류 등 다시 시도해도 안 되는 문제 | `false` |
+| 503 | 연결 오류, 요청 한도 초과, 안전 필터에 걸림 등 다시 그리면 될 수 있는 문제 | `true` |
