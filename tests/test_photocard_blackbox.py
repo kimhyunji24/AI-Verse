@@ -6,8 +6,10 @@
 
 수정 이력:
   - 2026-11-22 최초 작성
+  - 2026-11-22 요청 형식 {character, pose_skeleton} 반영, 포즈 뼈대 테스트 추가
 """
 
+import base64
 import io
 
 import pytest
@@ -28,11 +30,24 @@ def make_character(client, **answers):
 
 
 def image_requests(openai_server):
-    return [r for r in openai_server.requests if r["_path"].endswith("/images/generations")]
+    return [r for r in openai_server.requests if "/images/" in r["_path"]]
+
+
+def photocard(client, character, pose=None):
+    body = {"character": character}
+    if pose is not None:
+        body["pose_skeleton"] = pose
+    return client.post("/api/photocard", json=body)
+
+
+def skeleton_png(fmt="PNG", size=(512, 768)) -> str:
+    buffer = io.BytesIO()
+    Image.new("RGB", size, "white").save(buffer, format=fmt)
+    return base64.b64encode(buffer.getvalue()).decode()
 
 
 def test_photocard_is_composed_and_served(client, openai_server):
-    response = client.post("/api/photocard", json=make_character(client))
+    response = photocard(client, make_character(client))
     assert response.status_code == 200
     body = response.json()
     assert body["card_url"] == f"/cards/{body['card_id']}/card.png"
@@ -49,14 +64,14 @@ def test_photocard_is_composed_and_served(client, openai_server):
 
 def test_each_card_gets_its_own_id(client, openai_server):
     character = make_character(client)
-    first = client.post("/api/photocard", json=character).json()
-    second = client.post("/api/photocard", json=character).json()
+    first = photocard(client, character).json()
+    second = photocard(client, character).json()
     assert first["card_id"] != second["card_id"]
 
 
 def test_prompt_uses_character_text_only(client, openai_server):
     character = make_character(client)
-    client.post("/api/photocard", json=character)
+    photocard(client, character)
     [request] = image_requests(openai_server)
     prompt = request["prompt"]
     assert character["appearance"] in prompt
@@ -72,7 +87,7 @@ def test_prompt_uses_character_text_only(client, openai_server):
     [("nonhuman", "머리 자리에 사물"), ("anime", "애니메이션풍")],
 )
 def test_prompt_follows_character_type(client, openai_server, character_type, expected):
-    client.post("/api/photocard", json=make_character(client, character_type=character_type))
+    photocard(client, make_character(client, character_type=character_type))
     [request] = image_requests(openai_server)
     assert expected in request["prompt"]
 
@@ -81,7 +96,7 @@ def test_long_text_still_fits_the_card(client, openai_server):
     character = make_character(client)
     character["message_2027"] = "아주 긴 메시지입니다. " * 40
     character["disposition"] = "길고 긴 성향 설명. " * 30
-    response = client.post("/api/photocard", json=character)
+    response = photocard(client, character)
     assert response.status_code == 200
     card = client.get(response.json()["card_url"])
     assert Image.open(io.BytesIO(card.content)).size == CARD_SIZE
@@ -94,7 +109,7 @@ def test_long_text_still_fits_the_card(client, openai_server):
 def test_image_errors_become_clear_messages(client, openai_server, status, retryable):
     character = make_character(client)
     openai_server.status = status
-    response = client.post("/api/photocard", json=character)
+    response = photocard(client, character)
     assert response.status_code == (503 if retryable else 500)
     detail = response.json()["detail"]
     assert detail["retryable"] is retryable
@@ -104,5 +119,39 @@ def test_image_errors_become_clear_messages(client, openai_server, status, retry
 def test_incomplete_character_is_rejected(client, openai_server):
     character = make_character(client)
     del character["appearance"]
-    assert client.post("/api/photocard", json=character).status_code == 422
+    assert photocard(client, character).status_code == 422
+    assert image_requests(openai_server) == []
+
+
+def test_without_pose_the_image_is_generated_freely(client, openai_server):
+    photocard(client, make_character(client))
+    [request] = image_requests(openai_server)
+    assert request["_path"].endswith("/images/generations")
+    assert "뼈대" not in request["prompt"]
+
+
+@pytest.mark.parametrize("prefix", ["", "data:image/png;base64,"])
+def test_pose_skeleton_is_sent_as_reference(client, openai_server, prefix):
+    response = photocard(client, make_character(client), prefix + skeleton_png())
+    assert response.status_code == 200
+    [request] = image_requests(openai_server)
+    assert request["_path"].endswith("/images/edits")
+    assert "뼈대" in request["prompt"]
+    assert Image.open(io.BytesIO(request["image"])).size == (512, 768)
+    # 참고한 뼈대 그림도 카드와 함께 남는다
+    assert client.get(f"/cards/{response.json()['card_id']}/pose.png").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "pose",
+    [
+        "이건 그림이 아님",
+        base64.b64encode(b"not an image").decode(),
+        skeleton_png(fmt="JPEG"),
+        skeleton_png(size=(4096, 4096)),
+    ],
+)
+def test_invalid_pose_is_rejected_before_calling_ai(client, openai_server, pose):
+    response = photocard(client, make_character(client), pose)
+    assert response.status_code == 422
     assert image_requests(openai_server) == []
