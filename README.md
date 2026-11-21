@@ -46,7 +46,7 @@ touch .env             # API 키를 .env에 입력 (git에 올라가지 않음)
 uvicorn app.main:app --reload --port 8000
 ```
 
-`.env`에 넣을 키: `OPENAI_API_KEY` (필수), `OPENAI_MODEL` (선택, 기본값 `gpt-6.1-terra`). 필요한 키가 늘면 여기에 추가합니다.
+`.env`에 넣을 키: `OPENAI_API_KEY` (필수). 모델을 바꾸는 변수(`OPENAI_MODEL`, `OPENAI_IMAGE_MODEL` 등)와 각 모델의 쓰임은 [`docs/ai-models.md`](docs/ai-models.md)를 참고합니다.
 
 확인: http://localhost:8000/health, API 문서: http://localhost:8000/docs
 
