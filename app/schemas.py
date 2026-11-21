@@ -9,6 +9,7 @@
   - 2026-11-03 설문 4문항 추가, 눈 크기를 미간 너비로 교체, 색감·고유 능력 추가
   - 2026-11-03 얼굴 측정 항목 확대, 룰이 후보를 만들고 GPT가 결정하는 하이브리드 구조로 변경
   - 2026-11-03 캐릭터 유형(인외, 애니) 추가, GPT 결과를 재검증하지 않도록 변경
+  - 2026-11-22 포토카드 응답 형식 추가
 """
 
 from typing import Literal
@@ -113,3 +114,11 @@ class CharacterResponse(AiDecision):
     ability: str
     # 어떤 파라미터로 만들어졌는지 체험 화면에 보여주기 위해 함께 반환한다
     parameters: CharacterParameters
+
+
+class PhotocardResponse(BaseModel):
+    """포토카드 생성 결과. 주소는 백엔드 주소 기준의 경로다."""
+
+    card_id: str
+    illustration_url: str
+    card_url: str
