@@ -7,16 +7,35 @@
 
 수정 이력:
   - 2026-11-03 최초 작성
+  - 2026-11-22 이미지 생성 요청 응답과 포토카드 저장 폴더(임시 폴더) 추가
 """
 
+import base64
+import io
 import json
+import os
+import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
-from app.main import app
+# 앱을 불러오기 전에 정해야 카드 파일 제공 폴더(/cards)도 임시 폴더를 가리킨다
+CARD_DIR = tempfile.mkdtemp(prefix="cards-")
+os.environ["CARD_OUTPUT_DIR"] = CARD_DIR
+
+from app.main import app  # noqa: E402
+
+
+def _png(size=(64, 64), color=(120, 80, 200)) -> str:
+    buffer = io.BytesIO()
+    Image.new("RGB", size, color).save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+FAKE_IMAGE_B64 = _png()
 
 STORY = {
     "reason": "달빛 조각이 먼저 끓어올랐다.",
@@ -86,8 +105,11 @@ def openai_server(monkeypatch):
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            request["_path"] = self.path
             fake.requests.append(request)
-            if fake.status == 200:
+            if fake.status == 200 and self.path.endswith("/images/generations"):
+                payload = {"created": 0, "data": [{"b64_json": FAKE_IMAGE_B64}]}
+            elif fake.status == 200:
                 payload = fake.body(request)
             else:
                 payload = {"error": {"message": "fake error", "type": "fake"}}

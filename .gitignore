@@ -6,3 +6,6 @@ __pycache__/
 .env*
 *.pem
 *.key
+
+# 생성된 포토카드와 일러스트
+output/
