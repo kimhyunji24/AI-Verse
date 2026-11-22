@@ -19,7 +19,7 @@
 | 단계 | 어디서 | 모델 | 입력 | 출력 | API |
 | --- | --- | --- | --- | --- | --- |
 | 얼굴 측정 | 브라우저 | MediaPipe Face Landmarker | 웹캠 영상 | 얼굴 점 478개 → 수치 14개 | - |
-| 포즈 | 브라우저 | MediaPipe Pose Landmarker (lite) | 웹캠 영상 | 상반신 관절 → 뼈대 PNG | - |
+| 포즈 | 브라우저 | MediaPipe Pose Landmarker (lite) + Gesture Recognizer | 웹캠 영상 | 상반신 관절·손가락 → 뼈대 PNG, 손 모양 코드 | - |
 | ① 룰 | 백엔드 | 없음 (규칙 표) | 수치 14개, 설문 | 점수, 후보, 기본 능력치, 색감, 고유 능력 | - |
 | ② 화풍·특징 추출 | 백엔드 → OpenAI | 글 모델 | 참고 캐릭터 이름, 얼굴 생김새 문구 | 화풍 지시문 + 생김새가 반영된 눈·귀 특징 | `POST /v1/responses` (구조화 출력) |
 | ③ 캐릭터 결정 | 백엔드 → OpenAI | 글 모델 | ①의 재료 (+ ②의 화풍) | 이름, 종족, 외형, 설정, 메시지 등 | `POST /v1/responses` (구조화 출력) |
@@ -36,6 +36,7 @@
 | --- | --- | --- | --- |
 | Face Landmarker | `face_landmarker/float16/1/face_landmarker.task` | `src/hooks/useFaceLandmarker.ts` | 위치 맞추기, 얼굴 측정 (2초 평균) |
 | Pose Landmarker lite | `pose_landmarker_lite/float16/1/pose_landmarker_lite.task` | `src/hooks/usePoseLandmarker.ts` | 포즈 단계에서만 계산 |
+| Gesture Recognizer | `gesture_recognizer/float16/1/gesture_recognizer.task` | `src/hooks/usePoseLandmarker.ts` | 포즈 단계에서만, 손 21점과 손 모양 7종 |
 
 뼈대 PNG(`src/lib/poseSkeleton.ts`): 흰 바탕 512×768, 얼굴 없이 머리는 빈 원, 왼팔·오른팔은 다른 색 선. 화면과 같은 거울 모드 기준입니다.
 
@@ -77,6 +78,7 @@
 - **프롬프트**: 캐릭터 글(외형, 종족, 속성, 색감, 배경)로 만듭니다. 얼굴 수치는 넣지 않습니다.
   - 애니메이션이면 "사람이 아닌 캐릭터, 사람으로 그리지 않는다"는 첫 줄에 화풍 글, 눈·귀 특징, 얼굴 생김새 문구를 추가합니다.
   - 카드에 맞게 세로 2:3, 머리는 위에서 20% 아래, 아래 3분의 1은 글자 패널이 덮을 자리로 둡니다. 글자·로고·테두리는 넣지 않습니다.
+- **손 모양**: `hand_gestures` 코드를 서버의 정해 둔 문장으로 바꿔 "손 모양: 그림의 왼쪽 손은 …" 한 줄을 추가합니다.
 - **포즈**: 뼈대 PNG가 있으면 `images.edit`에 참고 이미지로 보내고 "이 자세를 따르되 뼈대 선은 남기지 않는다"고 지시합니다. 없으면 `images.generate`로 자유 자세.
 - **제한**: 120초, 재시도 1회. 안전 필터에 걸리면 "다시 그리기"가 가능한 오류(503)로 돌려줍니다.
 

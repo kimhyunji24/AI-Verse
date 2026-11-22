@@ -142,7 +142,8 @@ front(`feat/front`)와 back(`feat/back`) 사이의 데이터 형식입니다. �
 ```json
 {
   "character": { "...": "POST /api/character 응답 본문 전체" },
-  "pose_skeleton": "data:image/png;base64,iVBORw0KGgo..."
+  "pose_skeleton": "data:image/png;base64,iVBORw0KGgo...",
+  "hand_gestures": [{ "side": "left", "gesture": "Victory" }, { "side": "right", "gesture": "Thumb_Up" }]
 }
 ```
 
@@ -151,6 +152,9 @@ front(`feat/front`)와 back(`feat/back`) 사이의 데이터 형식입니다. �
   - 있으면 이미지 편집 API에 참고 이미지로 보내 캐릭터가 같은 자세를 취하게 하고, 카드 폴더에 `pose.png`로 함께 저장합니다.
   - 없거나 `null`이면 자유 자세로 그립니다.
   - PNG가 아니거나, 읽을 수 없거나, 한 변이 2048px보다 크면 AI를 호출하지 않고 422로 거절합니다.
+- `hand_gestures`(선택, 최대 2개): 포즈를 찍은 순간의 손 모양. `side`는 화면(거울 모드)과 뼈대 그림 기준 `left`/`right`, `gesture`는 MediaPipe Gesture Recognizer 이름 7종(`Closed_Fist`, `Open_Palm`, `Pointing_Up`, `Thumb_Down`, `Thumb_Up`, `Victory`, `ILoveYou`) 중 하나입니다.
+  - 서버가 정해 둔 문장으로 바꿔 이미지 프롬프트에 넣습니다(예: `그림의 왼쪽 손은 검지와 중지만 펴서 V자를 만든 손(브이)`). 다른 값은 422로 거절합니다.
+  - 뼈대 PNG에는 손가락 관절(손 21점)도 가는 선과 점으로 그려집니다.
 
 ### 응답 (200)
 
