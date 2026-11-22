@@ -17,6 +17,7 @@
   - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체, 화풍 추출 테스트 삭제
   - 2026-11-22 동물 종류와 이름 낱말이 무작위인지 확인하도록 변경
   - 2026-11-22 이름이 '~한 + 종족' 형식인지 확인 추가
+  - 2026-11-22 의상(outfit) 무작위 확인 추가, 동물 머리 유형 지시 확인으로 변경
 """
 
 import itertools
@@ -114,7 +115,7 @@ def test_response_has_every_card_field(client, openai_server):
 
 
 # 무작위로 뽑는 재료. 같은 입력이어도 매번 달라진다.
-RANDOM_FIELDS = ("name_hints",)
+RANDOM_FIELDS = ("name_hints", "outfit")
 
 
 def test_same_input_gives_same_rule_result_except_random_picks(client, openai_server):
@@ -275,8 +276,8 @@ def test_instructions_explain_both_character_types(client, openai_server):
     instructions = openai_server.requests[0]["instructions"]
     assert "머리가 사물인 인외 캐릭터:" in instructions
     assert "촉수나 괴물로 만들지 않고" in instructions
-    assert "실제 동물 캐릭터:" in instructions
-    assert "옷이나 장신구를 입히지 않고" in instructions
+    assert "머리가 실제 동물인 인외 캐릭터:" in instructions
+    assert "outfit의 옷을 입는다" in instructions
 
 
 def test_instructions_forbid_judging_the_participant(client, openai_server):
@@ -440,3 +441,15 @@ def test_name_is_assembled_from_a_hint_and_the_race(client, openai_server):
         hints, race = data["parameters"]["name_hints"], data["race"]
         assert race == data["parameters"]["race_candidates"][0]
         assert data["name"] in {f"{hint} {race}" for hint in hints}, data["name"]
+
+
+OUTFIT_WORDS = ("체크무늬 셔츠", "공주 드레스", "양복", "수면 잠옷", "한복", "롱패딩")
+
+
+def test_outfit_is_one_of_six_templates_and_random(client, openai_server):
+    outfits = {create(client)["parameters"]["outfit"] for _ in range(12)}
+    for outfit in outfits:
+        assert sum(word in outfit for word in OUTFIT_WORDS) == 1, outfit
+    # 같은 입력이어도 매번 무작위로 고른다
+    assert len(outfits) > 1
+    assert "outfit" in openai_server.requests[0]["instructions"]

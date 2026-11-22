@@ -12,6 +12,7 @@
   - 2026-11-22 파일을 직접 열 때 한글이 깨지는 문제 수정 (UTF-8 인코딩 선언 추가)
   - 2026-11-22 이름 음절 표를 이름 낱말(name_hints) 표로 변경
   - 2026-11-22 실제 동물 캐릭터로 교체: 화풍 추출 단락과 참고 캐릭터 표 삭제, 동물·이름 낱말을 무작위 풀로 표시
+  - 2026-11-22 의상 템플릿 표 추가
 """
 
 import argparse
@@ -204,7 +205,7 @@ ul {{ margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 75ch }}
   <a href="#image">③ 일러스트</a>
   <div class="label">프롬프트에 들어가는 재료</div>
   <a href="#traits">얼굴 생김새 문구</a>
-  <a href="#roles">무작위 재료 (동물·이름 수식어)</a>
+  <a href="#roles">무작위 재료 (동물·의상·이름 수식어)</a>
   <a href="#models">모델과 환경변수</a>
 </nav>
 
@@ -265,10 +266,12 @@ ul {{ margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 75ch }}
 </section>
 
 <section id="roles">
-  <h2>무작위 재료 (동물·이름 수식어)</h2>
+  <h2>무작위 재료 (동물·의상·이름 수식어)</h2>
   <p>아래 재료는 응답이나 얼굴로 정하지 않고 <b>참가자마다 매번 무작위로</b> 뽑아 ②에 보냅니다. 같은 사람이 다시 해도 다르게 나옵니다.</p>
   <h3>실제 동물 후보 (<code>ANIMAL_POOL</code>, {len(P.ANIMAL_POOL)}종 중 {P.ANIMAL_CANDIDATE_COUNT}개)</h3>
   <p class="meta">{e(" ".join(P.ANIMAL_POOL))}</p>
+  <h3>의상 템플릿 (<code>outfit</code>, {len(P.OUTFITS)}종 중 1개)</h3>
+  <div class="table"><table><tr><th>키</th><th>프롬프트에 들어가는 문장</th></tr>{rows([(f"<code>{e(k)}</code>", e(v)) for k, v in P.OUTFITS.items()])}</table></div>
   <h3>이름 수식어 (<code>name_hints</code>, {len(P.NAME_MODIFIERS)}개 중 {P.NAME_HINT_COUNT}개)</h3>
   <p>이름은 "수식어 + 종족"(예: 보송보송한 토끼) 형식이고, GPT가 이 중 하나를 그대로 수식어로 씁니다. 예시 입력: <code>{e(" · ".join(params.name_hints))}</code></p>
   <p class="meta">{e(" ".join(P.NAME_MODIFIERS))}</p>

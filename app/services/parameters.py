@@ -22,6 +22,7 @@
   - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체: 참고 캐릭터·화풍 표 삭제, 종족 후보를 실제 동물로
   - 2026-11-22 동물 종류와 이름 낱말을 입력에 따라 정하던 표 대신 매번 무작위로 뽑도록 변경
   - 2026-11-22 이름 낱말을 '~한'으로 끝나는 완성형 수식어로 변경 (이름이 '~한 + 종족' 형식이 됨)
+  - 2026-11-22 의상 템플릿 6종(OUTFITS) 추가, 참가자마다 무작위로 하나, 실제 동물을 '동물 머리 + 사람 몸'으로 변경
 """
 
 import random
@@ -80,7 +81,17 @@ WISHES = {
 
 CHARACTER_TYPES = {
     "nonhuman": "머리가 사물인 인외 캐릭터",
-    "animal": "실제 동물 캐릭터",
+    "animal": "머리가 실제 동물인 인외 캐릭터",
+}
+
+# 의상 템플릿: 두 유형 모두 목 아래는 사람의 몸이라 이 중 하나를 입는다. 참가자마다 무작위로 고른다.
+OUTFITS = {
+    "check_shirt": "빨간 체크무늬 셔츠",
+    "princess_dress": "핑크 톤의 공주 드레스와 머리 위의 작은 왕관·리본 머리 장식",
+    "suit": "검은 양복, 흰 셔츠, 빨간 넥타이",
+    "pajamas": "보송보송한 극세사 수면 잠옷(파스텔 톤)",
+    "hanbok": "색동 저고리가 있는 한복",
+    "winter_padding": "두툼한 겨울 롱패딩",
 }
 
 # 이름 수식어: 이름은 "~한 + 종족"(보송보송한 토끼) 형식이다. 참가자마다 이 풀에서 무작위로 골라 주고,
@@ -335,5 +346,6 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
         ],
         base_stats=_base_stats(features, answers, scores),
         name_hints=_name_hints(),
+        outfit=OUTFITS[_random.choice(list(OUTFITS))],
         face_traits=_face_traits(scores) if animal else [],
     )

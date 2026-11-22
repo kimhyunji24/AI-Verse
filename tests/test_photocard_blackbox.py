@@ -12,6 +12,7 @@
   - 2026-11-22 손 모양 확인 추가
   - 2026-11-22 카드 ID가 생성 시각 형식인지 확인 추가
   - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체
+  - 2026-11-22 사진관 프로필 스타일(의상, 우주·레이저 배경, 동물 머리 + 사람 몸) 확인으로 변경
 """
 
 import base64
@@ -84,7 +85,7 @@ def test_prompt_uses_character_text_only(client, openai_server):
     [request] = image_requests(openai_server)
     prompt = request["prompt"]
     assert character["appearance"] in prompt
-    assert character["palette"] in prompt
+    assert character["parameters"]["outfit"] in prompt
     # 얼굴 측정값은 이미지 생성 요청에 들어가지 않는다
     for name, value in FEATURES.items():
         assert name not in prompt
@@ -93,7 +94,7 @@ def test_prompt_uses_character_text_only(client, openai_server):
 
 @pytest.mark.parametrize(
     "character_type, expected",
-    [("nonhuman", "머리 자리에 사물"), ("animal", "실제 동물 한 마리를 사진처럼 사실적으로")],
+    [("nonhuman", "머리 자리에 사물"), ("animal", "머리는 실제 동물의 머리이고 목 아래는 사람의 몸")],
 )
 def test_prompt_follows_character_type(client, openai_server, character_type, expected):
     photocard(client, make_character(client, character_type=character_type))
@@ -203,11 +204,14 @@ def test_card_id_starts_with_creation_time(client, openai_server):
     assert card_id.startswith(before)
 
 
-def test_animal_prompt_has_face_traits_and_no_clothes(client, openai_server):
+def test_animal_prompt_is_a_suited_up_studio_portrait(client, openai_server):
     character = make_character(client, character_type="animal")
     photocard(client, character)
     [request] = image_requests(openai_server)
+    prompt = request["prompt"]
     for trait in character["parameters"]["face_traits"]:
-        assert trait in request["prompt"]
-    assert "옷이나 장신구를 입히지 않는다" in request["prompt"]
-    assert "화풍" not in request["prompt"]
+        assert trait in prompt
+    assert f"옷: {character['parameters']['outfit']}" in prompt
+    assert "90년대 사진관" in prompt and "무지개빛 레이저" in prompt
+    # 배경은 설문 장소가 아니라 우주·레이저로 고정
+    assert character["parameters"]["realm"] not in prompt
