@@ -10,6 +10,7 @@
 수정 이력:
   - 2026-11-22 최초 작성
   - 2026-11-22 파일을 직접 열 때 한글이 깨지는 문제 수정 (UTF-8 인코딩 선언 추가)
+  - 2026-11-22 이름 음절 표를 이름 낱말(name_hints) 표로 변경
 """
 
 import argparse
@@ -234,7 +235,7 @@ ul {{ margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 75ch }}
   <div class="label">프롬프트에 들어가는 재료</div>
   <a href="#refs">참고 캐릭터와 대체 화풍</a>
   <a href="#traits">얼굴 생김새 문구</a>
-  <a href="#roles">종족 후보와 이름 음절</a>
+  <a href="#roles">종족 후보와 이름 낱말</a>
   <a href="#models">모델과 환경변수</a>
 </nav>
 
@@ -321,11 +322,12 @@ ul {{ margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 75ch }}
 </section>
 
 <section id="roles">
-  <h2>종족 후보와 이름 음절</h2>
+  <h2>종족 후보와 이름 낱말</h2>
   <p>애니메이션 캐릭터의 종족 후보(<code>ANIME_ROLES</code>), 장소 응답 × 얼굴 실루엣별 2개. ③에서 <code>race_candidates</code>로 들어가고, GPT가 참고해 고르거나 새로 짓습니다.</p>
   <div class="table"><table><tr><th>장소</th><th>넓게 퍼지는 얼굴형</th><th>균형</th><th>길게 뻗는 얼굴형</th></tr>{role_rows}</table></div>
-  <p>이름 음절(<code>NAME_SOUNDS</code>, {len(P.NAME_SOUNDS)}개): 얼굴 측정값과 응답으로 {P.NAME_SOUND_COUNT}개를 골라 <code>name_sounds</code>로 ③에 보냅니다. 같은 입력이면 늘 같은 음절이 나오고, 참가자마다 달라 이름이 겹치지 않습니다. 예시 입력의 음절: <code>{e(" · ".join(params.name_sounds))}</code></p>
-  <p class="meta">{e(" ".join(P.NAME_SOUNDS))}</p>
+  <p>이름 낱말(<code>name_hints</code>): 의태어 {P.NAME_HINT_COUNT[0]}개와 장소별 간식·작은 물건 {P.NAME_HINT_COUNT[1]}개를 얼굴 측정값과 응답으로 골라 ③에 보내고, GPT가 그중 하나로 애칭을 짓습니다. 같은 입력이면 늘 같은 낱말이 나오고, 참가자마다 달라 이름이 겹치지 않습니다. 예시 입력의 낱말: <code>{e(" · ".join(params.name_hints))}</code></p>
+  <p class="meta">의태어: {e(" ".join(P.NAME_MIMETIC))}</p>
+  <div class="table"><table><tr><th>장소</th><th>간식·작은 물건</th></tr>{rows([(e(k), e(" ".join(v))) for k, v in P.NAME_THINGS.items()])}</table></div>
 </section>
 
 <section id="models">

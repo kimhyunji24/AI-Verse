@@ -18,6 +18,7 @@
   - 2026-11-22 인외 콘셉트에 맞춰 참고 캐릭터와 대체 화풍을 사람이 아닌 캐릭터(동물·생물·마스코트)로만 구성
   - 2026-11-22 애니메이션 캐릭터 후보를 사람 직업에서 생물 종류로 교체
   - 2026-11-22 이름이 겹치지 않도록 참가자마다 다른 이름 음절(name_sounds) 추가
+  - 2026-11-22 뜻 없는 음절 대신 뜻이 있는 이름 낱말(name_hints: 의태어 + 장소별 간식·작은 물건)로 변경
 """
 
 import zlib
@@ -120,14 +121,20 @@ ART_STYLE_TABLE = {
     "transform": (5, 0, 1),
 }
 
-# 이름 음절: 얼굴 측정값과 응답으로 3개를 골라 이름에 쓰게 한다.
-# 참가자마다 다른 음절에서 출발해 같은 이름이 반복되지 않고, 같은 입력이면 늘 같은 음절이 나온다.
-NAME_SOUNDS = (
-    "몽", "포", "루", "쿠", "미", "토", "리", "코", "모", "나", "니", "노", "보", "비",
-    "소", "치", "키", "파", "푸", "호", "라", "로", "무", "부", "두", "도", "디", "피",
-    "유", "요", "마", "다", "랑", "롱", "동", "콩", "링", "솜", "봄", "별",
+# 이름 낱말: 뜻이 있는 낱말을 참가자마다 골라 주고, GPT가 그중 하나로 애칭을 짓게 한다.
+# (뜻 없는 음절을 주면 "부쿠루"처럼 아무 뜻 없는 이름이 나온다.)
+# 같은 입력이면 늘 같은 낱말이 나오고, 참가자마다 달라 이름이 겹치지 않는다.
+NAME_MIMETIC = (
+    "몽실", "뽀송", "말랑", "보들", "포동", "동글", "폭신", "쫀득", "꼬물", "몰랑", "뭉게", "토실",
+    "보송", "옹알", "꼬마", "콩닥", "방울", "살랑", "아롱", "또롱",
 )
-NAME_SOUND_COUNT = 3
+NAME_THINGS = {
+    "deep_sea": ("진주", "소라", "조약돌", "물방울", "미역", "해초", "모래", "산호", "조개", "물결"),
+    "night_sky": ("별사탕", "달떡", "솜사탕", "구름빵", "꿀별", "은하수", "새벽", "달빛", "유성", "오로라"),
+    "old_library": ("책갈피", "단추", "연필", "쿠키", "잉크", "도장", "종이배", "깃털", "양초", "열쇠"),
+    "neon_city": ("젤리", "팝콘", "사이다", "픽셀", "네온", "캔디", "콜라", "버블티", "전구", "스티커"),
+}
+NAME_HINT_COUNT = (2, 2)  # (의태어, 장소 낱말)
 
 # 애니메이션 캐릭터 얼굴에 옮길 생김새: 점수가 0.5에서 이만큼 벗어나면 (낮을 때, 높을 때) 문구를 쓴다.
 # 좋고 나쁨이 없는 생김새 묘사만 쓴다.
@@ -329,15 +336,20 @@ def _face_traits(scores: dict[str, float]) -> list[str]:
     return [FACE_TRAITS[name][scores[name] >= 0.5] for name in picked]
 
 
-def _name_sounds(features: FaceFeatures, answers: Answers) -> list[str]:
+def _pick(pool: tuple[str, ...], count: int, seed: int) -> list[str]:
+    picked: list[str] = []
+    while len(picked) < count:
+        word = pool[seed % len(pool)]
+        if word not in picked:
+            picked.append(word)
+        seed = seed // len(pool) + 7919 * (len(picked) + 1)
+    return picked
+
+
+def _name_hints(features: FaceFeatures, answers: Answers) -> list[str]:
     seed = zlib.crc32((features.model_dump_json() + answers.model_dump_json()).encode())
-    sounds = []
-    while len(sounds) < NAME_SOUND_COUNT:
-        sound = NAME_SOUNDS[seed % len(NAME_SOUNDS)]
-        if sound not in sounds:
-            sounds.append(sound)
-        seed = seed // len(NAME_SOUNDS) + 7919 * (len(sounds) + 1)
-    return sounds
+    mimetic, things = NAME_HINT_COUNT
+    return _pick(NAME_MIMETIC, mimetic, seed) + _pick(NAME_THINGS[answers.place], things, seed // 97)
 
 
 def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParameters:
@@ -379,7 +391,7 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
             DISPOSITIONS[answers.companion][near_gaze],
         ],
         base_stats=_base_stats(features, answers, scores),
-        name_sounds=_name_sounds(features, answers),
+        name_hints=_name_hints(features, answers),
         art_style=ART_STYLES[ART_STYLE_TABLE[answers.power][silhouette]] if anime else "",
         face_traits=_face_traits(scores) if anime else [],
     )
