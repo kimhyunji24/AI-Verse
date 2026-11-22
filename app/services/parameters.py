@@ -13,7 +13,14 @@
   - 2026-11-03 하이브리드로 변경: 값을 확정하는 대신 후보를 만들고 GPT 결정을 검증, 측정 항목 확대
   - 2026-11-03 애니 캐릭터 후보 추가, GPT 결과 재검증 제거
   - 2026-11-03 인외 후보를 머리가 사물인 캐릭터로 변경
+  - 2026-11-22 애니메이션 캐릭터에 화풍(유명 만화 화풍에서 뽑은 특징 텍스트)과 얼굴 생김새 문구 추가
+  - 2026-11-22 참고 캐릭터 목록 추가: 화풍은 참가자마다 GPT가 참고 캐릭터에서 뽑고, 아래 화풍 글은 실패 시 대체용으로 사용
+  - 2026-11-22 인외 콘셉트에 맞춰 참고 캐릭터와 대체 화풍을 사람이 아닌 캐릭터(동물·생물·마스코트)로만 구성
+  - 2026-11-22 애니메이션 캐릭터 후보를 사람 직업에서 생물 종류로 교체
+  - 2026-11-22 이름이 겹치지 않도록 참가자마다 다른 이름 음절(name_sounds) 추가
 """
+
+import zlib
 
 from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
 
@@ -66,8 +73,78 @@ WISHES = {
 
 CHARACTER_TYPES = {
     "nonhuman": "머리가 사물인 인외 캐릭터",
-    "anime": "애니메이션 인물 캐릭터",
+    "anime": "애니메이션 캐릭터",
 }
+
+# 애니메이션 캐릭터의 화풍을 뽑을 참고 캐릭터. 이름은 화풍 추출(services/art_style.py)에만 쓰고,
+# 응답·카드·이미지 프롬프트에는 넣지 않는다. 순서는 아래 ART_STYLES(대체용 화풍 글)와 맞춘다.
+# 인외 콘셉트라 사람 캐릭터는 넣지 않는다.
+ART_REFERENCES = (
+    "먼작귀(치이카와)의 치이카와",
+    "포켓몬스터의 피카츄",
+    "별의 커비의 커비",
+    "산리오의 마이멜로디",
+    "이웃집 토토로의 토토로",
+    "몰랑이의 몰랑이",
+)
+# 추출 결과에 나오면 안 되는 고유 이름. "원피스"(옷)처럼 일반 낱말과 겹치는 이름은 넣지 않는다.
+ART_REFERENCE_NAMES = {
+    ART_REFERENCES[0]: ("치이카와", "먼작귀"),
+    ART_REFERENCES[1]: ("피카츄", "포켓몬"),
+    ART_REFERENCES[2]: ("커비",),
+    ART_REFERENCES[3]: ("마이멜로디", "산리오"),
+    ART_REFERENCES[4]: ("토토로",),
+    ART_REFERENCES[5]: ("몰랑이",),
+}
+
+# 대체용 화풍 글: 화풍 추출이 실패하면 쓴다. 위 참고 캐릭터의 화풍을 미리 글로 뽑아 둔 것이며 작품 이름은 쓰지 않는다.
+ART_STYLES = (
+    "2등신의 작고 말랑한 동물 캐릭터. 동글동글한 몸, 짧은 팔다리, 작은 점 같은 눈, 분홍 볼터치, "
+    "굵고 부드러운 손그림 외곽선, 연한 파스텔 채색",
+    "몬스터 수집 게임풍 작은 생물. 단순하고 또렷한 실루엣, 짧은 팔다리, 큰 눈과 볼 무늬, 선명한 단색 몸과 포인트 색, "
+    "깔끔한 외곽선과 셀 채색",
+    "공처럼 동그란 몸 하나로 된 생물. 얼굴과 몸의 구분이 없고, 아주 짧은 팔과 큰 발, 세로로 긴 타원 눈, "
+    "부드러운 파스텔 단색과 은은한 그러데이션",
+    "둥근 마스코트 캐릭터풍. 커다랗고 동그란 머리와 작은 몸, 단순한 도형으로 된 이목구비, 작은 리본이나 모자 소품, "
+    "평면적인 단색 채색",
+    "숲속 정령 같은 큰 생물. 푹신한 털, 넓은 배, 작고 동그란 눈, 크레용과 수채가 섞인 따뜻한 질감",
+    "말랑한 찹쌀떡 같은 작은 생물. 흘러내리듯 둥근 몸, 아주 단순한 점 눈과 작은 입, 하얀 몸에 연한 파스텔 포인트, "
+    "얇고 부드러운 선",
+)
+# 화풍 고르기: 응답(갖고 싶은 힘) × 실루엣 단계 -> ART_REFERENCES / ART_STYLES 번호
+# 같은 실루엣 단계 안에서는 힘마다 화풍이 모두 다르도록 배치했다
+ART_STYLE_TABLE = {
+    "read_minds": (4, 2, 3),
+    "stop_time": (0, 4, 2),
+    "fly": (1, 3, 0),
+    "transform": (5, 0, 1),
+}
+
+# 이름 음절: 얼굴 측정값과 응답으로 3개를 골라 이름에 쓰게 한다.
+# 참가자마다 다른 음절에서 출발해 같은 이름이 반복되지 않고, 같은 입력이면 늘 같은 음절이 나온다.
+NAME_SOUNDS = (
+    "몽", "포", "루", "쿠", "미", "토", "리", "코", "모", "나", "니", "노", "보", "비",
+    "소", "치", "키", "파", "푸", "호", "라", "로", "무", "부", "두", "도", "디", "피",
+    "유", "요", "마", "다", "랑", "롱", "동", "콩", "링", "솜", "봄", "별",
+)
+NAME_SOUND_COUNT = 3
+
+# 애니메이션 캐릭터 얼굴에 옮길 생김새: 점수가 0.5에서 이만큼 벗어나면 (낮을 때, 높을 때) 문구를 쓴다.
+# 좋고 나쁨이 없는 생김새 묘사만 쓴다.
+FACE_TRAIT_THRESHOLD = 0.15
+FACE_TRAITS = {
+    "face_aspect_ratio": ("가로로 넓고 둥근 얼굴형", "세로로 갸름한 얼굴형"),
+    "eye_spacing_ratio": ("두 눈 사이가 가까운 편", "두 눈 사이가 먼 편"),
+    "inner_eye_gap_ratio": ("미간이 좁은 편", "미간이 넓은 편"),
+    "eye_position_ratio": ("눈이 얼굴 위쪽에 자리함", "눈이 얼굴 아래쪽에 자리함"),
+    "nose_length_ratio": ("코가 짧은 편", "코가 긴 편"),
+    "nose_width_ratio": ("코가 좁은 편", "코가 넓은 편"),
+    "mouth_width_ratio": ("입이 작은 편", "입이 큰 편"),
+    "lip_thickness_ratio": ("입술이 얇은 편", "입술이 도톰한 편"),
+    "jaw_width_ratio": ("턱선이 갸름한 편", "턱선이 넓은 편"),
+}
+# 두드러진 특징이 없을 때도 닮은 느낌이 나도록 최소한 이만큼은 고른다
+FACE_TRAIT_MIN = 3
 
 # 인외 캐릭터(머리가 사물, 몸은 사람)의 머리 후보: 응답(장소) × 실루엣 단계별 2개
 NONHUMAN_RACES = {
@@ -77,12 +154,13 @@ NONHUMAN_RACES = {
     "neon_city": (("자판기 머리", "게임기 머리"), ("브라운관 TV 머리", "헤드폰 머리"), ("네온사인 머리", "신호등 머리")),
 }
 
-# 애니 캐릭터의 역할 후보: 응답(장소) × 실루엣 단계별 2개
+# 애니메이션 캐릭터(사람이 아닌 생물)의 종류 후보: 응답(장소) × 실루엣 단계별 2개
+# 실루엣: 넓게 퍼지는(동글·통통) / 균형 / 길게 뻗는(늘씬·긴 꼬리)
 ANIME_ROLES = {
-    "deep_sea": (("심해 등대지기", "잠수 탐험가"), ("바다 마법사", "인양 기사"), ("해류 항해사", "심해 음유시인")),
-    "night_sky": (("별자리 학자", "천문대 견습생"), ("달빛 궁수", "별똥별 배달부"), ("유성 검사", "밤하늘 지도 제작자")),
-    "old_library": (("금서 사서", "마법 필경사"), ("룬 문자 해독가", "마법학교 우등생"), ("고서 수호 기사", "두루마리 소환사")),
-    "neon_city": (("뒷골목 해커", "네온 정비사"), ("홀로그램 아이돌", "도시 탐정"), ("네온 바이크 라이더", "전광판 마법사")),
+    "deep_sea": (("방울해파리", "조약돌게"), ("물결수달", "산호해마"), ("꼬리고래", "리본장어")),
+    "night_sky": (("별사탕햄스터", "달토끼"), ("구름고양이", "별똥다람쥐"), ("은하여우", "밤하늘부엉이")),
+    "old_library": (("책벌레쥐", "잉크고슴도치"), ("책갈피펭귄", "촛불너구리"), ("두루마리족제비", "고서올빼미")),
+    "neon_city": (("픽셀병아리", "네온개구리"), ("배터리강아지", "전구오리"), ("홀로그램고양이", "네온라쿤")),
 }
 RACE_TABLES = {"nonhuman": NONHUMAN_RACES, "anime": ANIME_ROLES}
 
@@ -233,6 +311,35 @@ def _base_stats(features: FaceFeatures, answers: Answers, scores: dict[str, floa
     return Stats(**stats)
 
 
+def art_reference(features: FaceFeatures, answers: Answers) -> str | None:
+    """애니메이션 캐릭터면 화풍을 뽑을 참고 캐릭터 이름을, 아니면 None을 돌려준다."""
+    if answers.character_type != "anime":
+        return None
+    return ART_REFERENCES[ART_STYLE_TABLE[answers.power][_tier(features, "face_aspect_ratio")]]
+
+
+def _face_traits(scores: dict[str, float]) -> list[str]:
+    """0.5에서 많이 벗어난 순서로 생김새 문구를 고른다."""
+    ranked = sorted(FACE_TRAITS, key=lambda name: abs(scores[name] - 0.5), reverse=True)
+    picked = [
+        name
+        for index, name in enumerate(ranked)
+        if index < FACE_TRAIT_MIN or abs(scores[name] - 0.5) >= FACE_TRAIT_THRESHOLD
+    ]
+    return [FACE_TRAITS[name][scores[name] >= 0.5] for name in picked]
+
+
+def _name_sounds(features: FaceFeatures, answers: Answers) -> list[str]:
+    seed = zlib.crc32((features.model_dump_json() + answers.model_dump_json()).encode())
+    sounds = []
+    while len(sounds) < NAME_SOUND_COUNT:
+        sound = NAME_SOUNDS[seed % len(NAME_SOUNDS)]
+        if sound not in sounds:
+            sounds.append(sound)
+        seed = seed // len(NAME_SOUNDS) + 7919 * (len(sounds) + 1)
+    return sounds
+
+
 def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParameters:
     silhouette = _tier(features, "face_aspect_ratio")
     gaze = _tier(features, "eye_spacing_ratio")
@@ -245,6 +352,7 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
     near_silhouette = _nearest_other_tier(features, "face_aspect_ratio", silhouette)
     near_gaze = _nearest_other_tier(features, "eye_spacing_ratio", gaze)
     near_presence = _nearest_other_tier(features, "jaw_width_ratio", presence)
+    anime = answers.character_type == "anime"
 
     return CharacterParameters(
         face_scores=scores,
@@ -271,4 +379,7 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
             DISPOSITIONS[answers.companion][near_gaze],
         ],
         base_stats=_base_stats(features, answers, scores),
+        name_sounds=_name_sounds(features, answers),
+        art_style=ART_STYLES[ART_STYLE_TABLE[answers.power][silhouette]] if anime else "",
+        face_traits=_face_traits(scores) if anime else [],
     )

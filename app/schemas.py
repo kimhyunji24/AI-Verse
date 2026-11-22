@@ -11,6 +11,9 @@
   - 2026-11-03 캐릭터 유형(인외, 애니) 추가, GPT 결과를 재검증하지 않도록 변경
   - 2026-11-22 포토카드 응답 형식 추가
   - 2026-11-22 포토카드 요청에 포즈 뼈대 그림 추가
+  - 2026-11-22 애니메이션 캐릭터용 화풍(art_style)과 얼굴 생김새(face_traits) 추가
+  - 2026-11-22 얼굴 생김새가 반영된 생김새 특징(art_features) 추가
+  - 2026-11-22 이름 음절(name_sounds) 추가
 """
 
 from typing import Literal
@@ -93,6 +96,13 @@ class CharacterParameters(BaseModel):
     disposition_candidates: list[str]
     # GPT가 참고해 조정하는 기본 능력치
     base_stats: Stats
+    # 이름에 쓸 음절 3개. 참가자마다 달라서 이름이 겹치지 않게 한다.
+    name_sounds: list[str] = []
+    # 애니메이션 캐릭터만: 화풍 특징 글과, 참가자와 닮게 옮길 얼굴 생김새 문구 (인외 캐릭터는 비어 있다)
+    art_style: str = ""
+    face_traits: list[str] = []
+    # 애니메이션 캐릭터만: 참고 캐릭터의 생김새 특징에 face_traits를 반영한 문장 (추출 실패 시 비어 있다)
+    art_features: list[str] = []
 
 
 class AiDecision(BaseModel):
