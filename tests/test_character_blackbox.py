@@ -115,7 +115,7 @@ def test_response_has_every_card_field(client, openai_server):
 
 
 # 무작위로 뽑는 재료. 같은 입력이어도 매번 달라진다.
-RANDOM_FIELDS = ("name_hints", "outfit")
+RANDOM_FIELDS = ("name_hints", "outfit", "emotion")
 
 
 def test_same_input_gives_same_rule_result_except_random_picks(client, openai_server):
@@ -453,3 +453,13 @@ def test_outfit_is_one_of_six_templates_and_random(client, openai_server):
     # 같은 입력이어도 매번 무작위로 고른다
     assert len(outfits) > 1
     assert "outfit" in openai_server.requests[0]["instructions"]
+
+
+def test_animal_gets_a_random_emotion_nonhuman_does_not(client, openai_server):
+    from app.services.parameters import EMOTIONS
+
+    labels = {label for label, _ in EMOTIONS}
+    emotions = {create(client, answers={"character_type": "animal"})["parameters"]["emotion"] for _ in range(12)}
+    assert emotions <= labels and len(emotions) > 1
+    assert create(client, answers={"character_type": "nonhuman"})["parameters"]["emotion"] == ""
+    assert "emotion의 감정을 한껏 과장" in openai_server.requests[0]["instructions"]

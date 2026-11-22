@@ -18,6 +18,8 @@
   - 2026-11-22 카드가 그림을 패널 위에만 배치하도록 바뀌어 정사각 구도로 변경, 손과 몸이 화면 안에 들어오도록 지시
   - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체 (사실적인 털과 질감, 옷 없음, 얼굴 생김새 반영)
   - 2026-11-22 90년대 사진관 프로필 사진 스타일로 변경: 머리만 바뀐 사람 몸, 의상 템플릿, 우주·무지개 레이저 배경 고정, 근엄한 표정
+  - 2026-11-22 동물 캐릭터는 고정 프롬프트(2등신 찹쌀떡 몸, 손그림 갈색 선, 파스텔)로 그리고 격한 감정과
+              설문 장소에 맞춘 단순한 배경을 넣도록 변경. 사물 머리 캐릭터는 사진관 스타일 그대로.
 """
 
 import base64
@@ -27,7 +29,7 @@ import os
 import openai
 
 from app.schemas import CharacterResponse, HandGesture
-from app.services.parameters import CHARACTER_TYPES
+from app.services.parameters import CHARACTER_TYPES, EMOTIONS, REALMS
 
 # 부스 대기 시간이 중요해서 빠른 모델과 중간 품질을 기본값으로 쓴다
 DEFAULT_MODEL = "gpt-image-2.5-flare"
@@ -35,22 +37,35 @@ DEFAULT_QUALITY = "medium"
 # 카드의 정보 패널 위 영역(1181×1152)이 거의 정사각이라 정사각으로 그린다
 SIZE = "1024x1024"
 
-STYLES = {
-    "nonhuman": (
-        "머리 자리에 사물이 달려 있고 목 아래는 사람의 몸인 인물. 사물은 사진처럼 사실적인 재질로 그리고, "
-        "사물에 사람 얼굴(눈, 코, 입)을 그려 넣지 않는다."
-    ),
-    "animal": (
-        "머리는 실제 동물의 머리이고 목 아래는 사람의 몸인 인물. 동물 머리는 사진처럼 사실적인 털과 질감으로, "
-        "사람 몸과 손은 자연스러운 사람의 몸과 손으로 그린다."
-    ),
-}
-# 두 유형 공통: 진지해서 오히려 웃긴 90년대 사진관 프로필 사진
+NONHUMAN_STYLE = (
+    "머리 자리에 사물이 달려 있고 목 아래는 사람의 몸인 인물. 사물은 사진처럼 사실적인 재질로 그리고, "
+    "사물에 사람 얼굴(눈, 코, 입)을 그려 넣지 않는다."
+)
+# 사물 머리 캐릭터: 진지해서 오히려 웃긴 90년대 사진관 프로필 사진
 PORTRAIT = (
     "90년대 사진관에서 찍은 프로필 사진처럼 사실적으로 그린다. 스튜디오 조명이 얼굴과 어깨를 부드럽게 비추고, "
     "진지하고 근엄한 표정으로 정면을 본다. 진지해서 오히려 웃긴 사진이다."
 )
 BACKGROUND = "우주와 은하수, 반짝이는 별, 그 사이를 휘감아 흐르는 무지개빛 레이저 띠. 90년대 사진관 레이저 배경 느낌."
+
+# 동물 캐릭터: 고정 프롬프트. 기존 작품·작가 이름은 넣지 않고 특징만 글로 적는다.
+ANIMAL_STYLE = """[Character Design & Anatomy]
+- Proportions: Chibi 2-head-tall round mochi-like body, no neck, chubby torso, and very short, stubby stub arms and legs with no fingers (for hand signs, tiny nub fingers are allowed).
+- The whole body is the animal: animal ears and fur patterns instead of human hair.
+- Face: Completely omit the nose. Big, round, glossy black eyes with two small white highlights, soft pink oval blush on the cheeks, and a tiny wavy 'w' or 'ω' mouth (the emotion below may change the eyes and mouth).
+- Outfit: simplified into minimal lines and flat colors fitted to the tiny body.
+[Art Style & Linework]
+- Outlines: Soft, slightly uneven hand-drawn dark brown (#3B2820) outlines instead of harsh black.
+- Coloring: Flat 2D cel-shading combined with gentle, low-saturation pastel watercolor wash textures. Minimal shadows, zero 3D rendering or realistic lighting.
+- An original character that does not resemble any existing character."""
+EMOTION_TEXT = dict(EMOTIONS)
+# 설문 장소(realm 문구) -> 동물 캐릭터 배경
+ANIMAL_BACKGROUNDS = {
+    REALMS["deep_sea"]: "a cozy, simple pastel underwater scene with a few bubbles and seaweed",
+    REALMS["night_sky"]: "a cozy, simple pastel night sky with a few stars",
+    REALMS["old_library"]: "a cozy, simple pastel corner of an old library with a few books",
+    REALMS["neon_city"]: "a cozy, simple pastel city street at dusk with a few soft glowing signs",
+}
 
 
 logger = logging.getLogger(__name__)
@@ -98,23 +113,14 @@ def build_prompt(
 ) -> str:
     parameters = character.parameters
     # parameters.character_type 에는 키(nonhuman)가 아니라 설명 문구가 들어 있다
-    type_key = next(
-        (key for key, label in CHARACTER_TYPES.items() if label == parameters.character_type),
-        "animal",
-    )
-    style = STYLES[type_key]
-    face_lines = (
-        [f"얼굴 생김새: {', '.join(parameters.face_traits)}. 이 생김새를 동물의 얼굴에 자연스럽게 반영한다."]
-        if type_key == "animal" and parameters.face_traits
-        else []
-    )
+    if parameters.character_type != CHARACTER_TYPES["nonhuman"]:
+        return _animal_prompt(character, with_pose=with_pose, hand_gestures=hand_gestures)
     return "\n".join(
         [
             "홀로그램 트레이딩 카드에 들어갈 그림 한 장을 정사각 구도로 그려라.",
-            f"주인공: {style}",
+            f"주인공: {NONHUMAN_STYLE}",
             f"사진 스타일: {PORTRAIT}",
             *([f"옷: {parameters.outfit}."] if parameters.outfit else []),
-            *face_lines,
             f"캐릭터: {character.race}, 속성은 {character.element}.",
             f"외형: {character.appearance}",
             f"배경: {BACKGROUND}",
@@ -124,6 +130,42 @@ def build_prompt(
             *([gesture_line(hand_gestures)] if hand_gestures else []),
             "글자, 숫자, 로고, 워터마크, 카드 테두리를 넣지 않는다.",
             "무섭거나 기괴하지 않게 그린다. 모든 연령이 보는 행사용이므로 잔인하거나 선정적인 요소를 넣지 않는다.",
+        ]
+    )
+
+
+def _animal_prompt(
+    character: CharacterResponse,
+    *,
+    with_pose: bool,
+    hand_gestures: list[HandGesture] | None,
+) -> str:
+    parameters = character.parameters
+    emotion = EMOTION_TEXT.get(parameters.emotion)
+    background = ANIMAL_BACKGROUNDS.get(parameters.realm, "a cozy, simple pastel room")
+    return "\n".join(
+        [
+            "Draw one square illustration of a single cute 2D animal character for a trading card.",
+            ANIMAL_STYLE,
+            f"Character: a {character.race} (Korean name of the animal), wearing {parameters.outfit or 'a simple outfit'}.",
+            f"Appearance notes (Korean): {character.appearance}",
+            *(
+                [f"Face traits to reflect (Korean): {', '.join(parameters.face_traits)}."]
+                if parameters.face_traits
+                else []
+            ),
+            *(
+                [f"Expression: MAXIMUM EMOTION, exaggerate it as much as possible: {emotion}."]
+                if emotion
+                else ["Expression: MAXIMUM EMOTION, pick one strong feeling and exaggerate it as much as possible."]
+            ),
+            *([f"Pose (Korean): {POSE_INSTRUCTIONS}"] if with_pose else []),
+            *([f"Hands (Korean): {gesture_line(hand_gestures)} Keep the stubby hands simple but readable."] if hand_gestures else []),
+            f"Background: {background}, hand-drawn picture-book style. Keep it soft and secondary to the character.",
+            "Composition: one character only, full body, centered and large, ears, tail and feet not cut off, "
+            "about 15% empty space above the head.",
+            "No text, numbers, logos, watermarks, speech bubbles or card borders.",
+            "Nothing scary or grotesque; this is an all-ages event.",
         ]
     )
 

@@ -23,6 +23,7 @@
   - 2026-11-22 동물 종류와 이름 낱말을 입력에 따라 정하던 표 대신 매번 무작위로 뽑도록 변경
   - 2026-11-22 이름 낱말을 '~한'으로 끝나는 완성형 수식어로 변경 (이름이 '~한 + 종족' 형식이 됨)
   - 2026-11-22 의상 템플릿 6종(OUTFITS) 추가, 참가자마다 무작위로 하나, 실제 동물을 '동물 머리 + 사람 몸'으로 변경
+  - 2026-11-22 동물 캐릭터를 2등신 찹쌀떡 몸의 손그림 캐릭터로 변경, 격한 감정(EMOTIONS)을 무작위로 하나 추가
 """
 
 import random
@@ -93,6 +94,41 @@ OUTFITS = {
     "hanbok": "색동 저고리가 있는 한복",
     "winter_padding": "두툼한 겨울 롱패딩",
 }
+
+# 동물 캐릭터의 감정: 표정과 몸짓을 한껏 과장해 그린다. 참가자마다 무작위로 하나 고른다.
+# (한국어 이름, 이미지 프롬프트 문장). 한국어 이름은 캐릭터 글에, 영어 문장은 그림에 쓴다.
+EMOTIONS = (
+    ("감격해서 눈물 글썽",
+     "so deeply moved that the eyes are brimming with big wobbly tears about to fall, cheeks flushed bright red, "
+     "mouth trembling in a wavy line, but clearly bursting with pride; tiny sparkles around the head"),
+    ("영혼 가출할 만큼 피곤",
+     "so utterly exhausted that its soul is visibly drifting out of its mouth as a tiny white ghost wisp, "
+     "eyes half-closed and droopy, a big sweat drop on the forehead, slouched"),
+    ("뿌듯해서 터질 것 같음",
+     "so proud it might burst: chest puffed out, nose-in-the-air smug face with eyes squeezed shut, "
+     "big sparkles and little shine lines all around"),
+    ("깜짝 놀라 털이 곤두섬",
+     "utterly shocked: eyes wide as tiny dots, mouth a small open circle, fur standing on end, "
+     "little exclamation-like shock lines bursting around the head"),
+    ("세상 억울함",
+     "deeply wronged and sulky: puffed-up cheeks, lower lip pushed out, teary glaring eyes, "
+     "a small dark scribble cloud above the head"),
+    ("너무 신나서 방방 뜀",
+     "overjoyed and bouncing: huge open-mouth smile, eyes curved into happy arcs, feet off the ground, "
+     "motion lines and little musical notes around"),
+    ("부끄러워서 녹아내림",
+     "so embarrassed it is melting: face glowing bright red up to the ears, eyes swirling, "
+     "steam puffs rising from the head, body slightly drooping like soft mochi"),
+    ("배고파서 침 줄줄",
+     "desperately hungry: sparkling starry eyes, drool dripping from the mouth, tummy rumbling with "
+     "little rumble lines, tiny food daydream bubble above the head"),
+    ("화나서 씩씩",
+     "fuming mad in a cute way: puffed red cheeks, furrowed brows, little steam puffs from the ears, "
+     "tiny anger vein mark on the head, stomping"),
+    ("감동받아 엉엉 울음",
+     "crying waterfalls of happy tears: two streams of tears gushing from the eyes, mouth wide open "
+     "in a wail, cheeks flushed, little hearts floating around"),
+)
 
 # 이름 수식어: 이름은 "~한 + 종족"(보송보송한 토끼) 형식이다. 참가자마다 이 풀에서 무작위로 골라 주고,
 # GPT가 그중 캐릭터에 어울리는 하나를 그대로 쓴다. 어색한 말("뭉게한")이 나오지 않도록 완성된 형태로 둔다.
@@ -347,5 +383,6 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
         base_stats=_base_stats(features, answers, scores),
         name_hints=_name_hints(),
         outfit=OUTFITS[_random.choice(list(OUTFITS))],
+        emotion=_random.choice(EMOTIONS)[0] if animal else "",
         face_traits=_face_traits(scores) if animal else [],
     )
