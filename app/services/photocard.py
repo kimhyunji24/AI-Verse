@@ -17,6 +17,7 @@
   - 2026-11-22 카드 번호를 카드 ID의 끝 4자리로 변경 (ID가 생성 시각으로 시작하게 바뀜)
   - 2026-11-22 긴 이름('~한 + 종족')은 말줄임 대신 글자 크기를 줄여 넣고, 이름에 종족이 있으면 아래 줄에서 종족을 뺌
   - 2026-11-22 타로풍 천체 프레임 이미지(CARD_FRAME)를 얹고, 이름·정보를 프레임 안쪽 아래 패널로 옮김 (무지개 테두리 대체)
+  - 2026-11-22 투명 배경 일러스트가 검게 나오던 문제 수정 (밝은 바탕에 얹은 뒤 합성)
 """
 
 import colorsys
@@ -215,6 +216,19 @@ def _cover(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     return resized.crop((left, top, left + size[0], top + size[1]))
 
 
+# 이미지 모델이 배경을 투명하게 줄 때 깔아 줄 밝은 바탕색
+ART_BACKDROP = (250, 246, 238)
+
+
+def _flatten(image: Image.Image) -> Image.Image:
+    """투명한 부분이 있으면 밝은 바탕에 얹는다. 그냥 RGB로 바꾸면 투명한 곳이 검게 나온다."""
+    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        rgba = image.convert("RGBA")
+        backdrop = Image.new("RGBA", rgba.size, (*ART_BACKDROP, 255))
+        return Image.alpha_composite(backdrop, rgba).convert("RGB")
+    return image.convert("RGB")
+
+
 @lru_cache(maxsize=2)
 def _frame(size: tuple[int, int]) -> Image.Image:
     path = os.getenv("CARD_FRAME", DEFAULT_FRAME_PATH)
@@ -249,7 +263,7 @@ def compose_card(
     rarity_name, rarity_color = RARITIES[stars]
 
     # 1) 일러스트: 패널 뒤까지 흐린 그림을 깔고, 패널 위 영역에만 선명한 그림을 얹는다
-    art = Image.open(io.BytesIO(illustration_png)).convert("RGB")
+    art = _flatten(Image.open(io.BytesIO(illustration_png)))
     card = _cover(art, size).filter(ImageFilter.GaussianBlur(28))
     card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.35)
     sharp = _cover(art, (WIDTH, ART_BOTTOM))
