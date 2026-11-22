@@ -13,6 +13,7 @@
  *   - 2026-11-03 캐릭터 유형 재료 추가
  *   - 2026-11-03 인외 재료를 촉수에서 찻주전자로 변경
  *   - 2026-11-22 애니메이션 캐릭터 선택지를 실제 동물로 바꾸며 재료를 동물 발자국으로 변경
+ *   - 2026-11-22 캐릭터 유형 재료 이름을 선택지와 바로 연결되게 변경 (말하는 찻주전자 → 사물 머리)
  */
 
 import type { IconType } from "react-icons";
@@ -95,7 +96,7 @@ export function faceIngredients(features: FaceFeatures): Ingredient[] {
 
 // 설문 선택지별 재료. 키는 lib/characterApi.ts 의 QUESTIONS 값과 같다.
 export const ANSWER_INGREDIENTS: Record<string, IngredientLook> = {
-  nonhuman: { Icon: GiTeapot, label: "말하는 찻주전자", color: "#a78bfa" },
+  nonhuman: { Icon: GiTeapot, label: "사물 머리", color: "#a78bfa" },
   animal: { Icon: GiPawPrint, label: "작은 발자국", color: "#f9a8d4" },
   deep_sea: { Icon: GiSpiralShell, label: "심해 소라", color: "#5eead4" },
   night_sky: { Icon: GiFallingStar, label: "떨어진 별", color: "#fde047" },
