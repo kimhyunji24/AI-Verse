@@ -14,6 +14,7 @@
   - 2026-11-22 풀아트 홀로그램 템플릿으로 변경 (전면 일러스트, 홀로 포일 테두리, 반짝이, 유리 패널, 1/1 표기)
   - 2026-11-22 일러스트를 정보 패널 위 영역에만 배치해 캐릭터가 패널에 가려지지 않게 변경, 패널 뒤는 흐린 그림으로 채움
   - 2026-11-22 그림이 뿌옇게 보이던 문제 수정: 그림 전체 무지개 막을 없애고 광택은 가늘고 약하게, 반짝이는 가장자리에만 적게
+  - 2026-11-22 카드 번호를 카드 ID의 끝 4자리로 변경 (ID가 생성 시각으로 시작하게 바뀜)
 """
 
 import colorsys
@@ -436,7 +437,8 @@ def compose_card(
     footer_font = _font(22, 800)
     draw.text((PAD, footer_y), "ai-dentity", font=footer_font, fill=(210, 205, 235), anchor="lm")
     draw.text((WIDTH / 2, footer_y), "이게 나라고?", font=footer_font, fill=(210, 205, 235), anchor="mm")
-    serial = f"No.{card_id[:4].upper()} · 1/1" if card_id else "1/1"
+    # 카드 ID는 생성 시각으로 시작하므로 끝의 무작위 4자리를 번호로 쓴다
+    serial = f"No.{card_id[-4:].upper()} · 1/1" if card_id else "1/1"
     draw.text((WIDTH - PAD, footer_y), serial, font=footer_font, fill=GOLD, anchor="rm")
 
     card.alpha_composite(ui)
