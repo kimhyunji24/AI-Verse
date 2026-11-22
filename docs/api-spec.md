@@ -41,7 +41,7 @@ front(`feat/front`)와 back(`feat/back`) 사이의 데이터 형식입니다. �
     "head_roll": -0.9
   },
   "answers": {
-    "character_type": "anime",
+    "character_type": "animal",
     "place": "deep_sea",
     "companion": "alone",
     "wish_2027": "adventure",
@@ -71,7 +71,7 @@ front(`feat/front`)와 back(`feat/back`) 사이의 데이터 형식입니다. �
 
 | 응답 항목 | 값 |
 | --- | --- |
-| `character_type` | `nonhuman`, `anime` |
+| `character_type` | `nonhuman`(오브젝트 헤드), `animal`(실제 동물) |
 | `place` | `deep_sea`, `night_sky`, `old_library`, `neon_city` |
 | `companion` | `alone`, `one_friend`, `crowd` |
 | `wish_2027` | `adventure`, `rest`, `growth`, `connection` |
@@ -100,17 +100,16 @@ front(`feat/front`)와 back(`feat/back`) 사이의 데이터 형식입니다. �
 }
 ```
 
-`race`는 오브젝트 헤드면 머리에 달린 사물(예: `등대 머리`), 애니메이션 캐릭터면 사람이 아닌 생물의 종류(예: `물결수달`)입니다. `parameters.name_sounds`는 이름에 쓰는 음절 3개입니다. `parameters`는 룰이 만든 재료 전체입니다.
+`race`는 오브젝트 헤드면 머리에 달린 사물(예: `등대 머리`), 실제 동물 캐릭터면 동물 이름(예: `수달`)입니다.
 
-애니메이션 캐릭터(`character_type: "anime"`)는 `parameters`에 두 값이 더 들어갑니다. 인외 캐릭터는 빈 값(`""`, `[]`)입니다.
+다음 재료는 응답이나 얼굴로 정하지 않고 **참가자마다 무작위로** 뽑습니다. 같은 입력이어도 매번 다릅니다.
 
 | 필드 | 뜻 |
 | --- | --- |
-| `art_style` | 화풍 지시문. 참고 캐릭터 6개 중 하나를 응답(`power`) × 얼굴 실루엣 단계로 고르고, GPT가 그 그림체를 글로 뽑습니다. 이름은 들어가지 않으며, 추출이 실패하면 미리 써 둔 화풍 글을 씁니다 |
-| `face_traits` | 참가자와 닮게 옮길 얼굴 생김새 문구(최소 3개). 예: `두 눈 사이가 먼 편`, `입이 작은 편`. 좋고 나쁨을 평가하는 말은 쓰지 않습니다 |
-| `art_features` | 참고 캐릭터의 눈·귀 특징에 `face_traits`를 반영한 문장(최대 4개). 추출이 실패하면 빈 배열입니다 |
+| `parameters.race_candidates` (실제 동물) | 동물 40종 풀에서 무작위 3개. GPT가 그중 하나를 고릅니다 |
+| `parameters.name_hints` | 이름 낱말 4개: 의태어 2개(예: `몽실`) + 간식·작은 물건 2개(예: `찹쌀떡`). GPT가 그중 하나로 애칭을 짓습니다 |
 
-캐릭터는 화풍 특징을 참고만 하고 기존 캐릭터와 구별되는 오리지널로 그리며, 얼굴은 `face_traits`만큼 참가자와 닮게 그립니다. 이 문구는 GPT 글 생성과 이미지 생성 요청에 함께 들어갑니다.
+실제 동물 캐릭터는 `parameters.face_traits`(참가자와 닮게 옮길 얼굴 생김새 문구, 예: `두 눈 사이가 먼 편`)가 함께 들어갑니다. 오브젝트 헤드는 빈 배열입니다. 좋고 나쁨을 평가하는 말은 쓰지 않으며, 이 문구는 GPT 글 생성과 이미지 생성 요청에 함께 들어갑니다.
 
 기본 능력치(`base_stats`)는 합계가 항상 300입니다. 어떤 얼굴도 우열이 생기지 않게 하기 위해서입니다. 최종 `stats`는 GPT가 정하며 프롬프트로 같은 규칙을 지시하지만 서버가 강제하지는 않습니다.
 
