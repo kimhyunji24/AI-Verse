@@ -392,13 +392,14 @@ def test_instructions_ask_for_short_cute_names(client, openai_server):
 def test_name_hints_are_random_meaningful_words(client, openai_server):
     draws = [tuple(create(client)["parameters"]["name_hints"]) for _ in range(6)]
     for hints in draws:
-        assert len(hints) == 4 and len(set(hints)) == 4
-        assert all(len(word) >= 2 for word in hints)
+        assert len(hints) == 3 and len(set(hints)) == 3
+        # 이름 앞에 그대로 붙일 수 있는 완성형 수식어다
+        assert all(word.endswith(("한", "은", "는", "린")) for word in hints), hints
     # 같은 입력이어도 매번 무작위로 달라진다
     assert len(set(draws)) > 1
     instructions = openai_server.requests[0]["instructions"]
     assert "name_hints" in instructions
-    assert "뜻 없는 소리" in instructions
+    assert "그대로 쓴다" in instructions
 
 
 def test_animal_gets_face_traits_nonhuman_does_not(client, openai_server):
@@ -422,18 +423,20 @@ def test_animal_race_candidates_are_random_real_animals(client, openai_server):
     assert len(set(draws)) > 1
 
 
-def test_name_always_ends_with_race(client, openai_server):
-    # 모델이 종족을 빠뜨린 이름을 줘도 "~한 + 종족" 형식으로 맞춘다
-    openai_server.choose = lambda parameters: {
-        **openai_server.first_candidates(parameters),
-        "name": "보송보송한",
-    }
-    data = create(client, answers={"character_type": "animal"})
-    assert data["name"] == f"보송보송한 {data['race']}"
-    # 이미 종족이 들어 있으면 그대로 둔다
-    openai_server.choose = lambda parameters: {
-        **openai_server.first_candidates(parameters),
-        "name": f"몽실한 {parameters['race_candidates'][0]}",
-    }
-    data = create(client, answers={"character_type": "animal"})
-    assert data["name"] == f"몽실한 {data['race']}"
+def test_name_is_assembled_from_a_hint_and_the_race(client, openai_server):
+    # 모델이 종족만 주거나, 후보에 없는 수식어를 쓰거나, 종족에 수식어를 붙여도 "후보 수식어 + 종족"으로 맞춘다
+    cases = [
+        lambda p: {"name": "보송이"},
+        lambda p: {"name": f"포근한 {p['race_candidates'][0]}"},
+        lambda p: {"name": f"{p['name_hints'][1]} {p['race_candidates'][0]}"},
+        lambda p: {"name": "아무개", "race": f"{p['name_hints'][2]} {p['race_candidates'][0]}"},
+    ]
+    for make in cases:
+        openai_server.choose = lambda parameters, make=make: {
+            **openai_server.first_candidates(parameters),
+            **make(parameters),
+        }
+        data = create(client, answers={"character_type": "animal"})
+        hints, race = data["parameters"]["name_hints"], data["race"]
+        assert race == data["parameters"]["race_candidates"][0]
+        assert data["name"] in {f"{hint} {race}" for hint in hints}, data["name"]
