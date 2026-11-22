@@ -10,10 +10,13 @@
   - 2026-11-22 애니메이션 캐릭터 프롬프트에 화풍과 얼굴 생김새가 들어가는지 확인 추가
   - 2026-11-22 생김새 특징이 프롬프트에 들어가는지 확인 추가
   - 2026-11-22 손 모양 확인 추가
+  - 2026-11-22 카드 ID가 생성 시각 형식인지 확인 추가
 """
 
 import base64
 import io
+import re
+from datetime import datetime
 
 import pytest
 from PIL import Image
@@ -208,3 +211,10 @@ def test_invalid_hand_gestures_are_rejected(client, openai_server, hands):
     response = photocard(client, make_character(client), skeleton_png(), hands)
     assert response.status_code == 422
     assert image_requests(openai_server) == []
+
+
+def test_card_id_starts_with_creation_time(client, openai_server):
+    before = datetime.now().strftime("%Y%m%d")
+    card_id = photocard(client, make_character(client)).json()["card_id"]
+    assert re.fullmatch(r"\d{8}-\d{6}-[0-9a-f]{4}", card_id)
+    assert card_id.startswith(before)

@@ -9,12 +9,14 @@
   - 2026-11-22 최초 작성
   - 2026-11-22 요청 형식을 {character, pose_skeleton}으로 바꾸고 포즈 뼈대 그림 검증 추가
   - 2026-11-22 손 모양(hand_gestures)을 일러스트 생성에 전달
+  - 2026-11-22 카드 폴더 이름을 생성 시각으로 변경 (예: 20261122-163045-a3f9)
 """
 
 import base64
 import binascii
 import io
-import uuid
+import secrets
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -52,6 +54,12 @@ def _pose_png(encoded: str) -> bytes:
     return output.getvalue()
 
 
+def new_card_id() -> str:
+    """생성 시각(초)과 무작위 4자리로 만든다. 폴더가 시간순으로 정렬되고, 같은 초에 만들어도 겹치지 않는다.
+    끝 4자리는 카드에 찍히는 번호(No.XXXX)로도 쓴다."""
+    return f"{datetime.now():%Y%m%d-%H%M%S}-{secrets.token_hex(2)}"
+
+
 @router.post("/photocard", response_model=PhotocardResponse)
 def create_photocard(req: PhotocardRequest):
     character = req.character
@@ -64,7 +72,7 @@ def create_photocard(req: PhotocardRequest):
             detail={"message": str(error), "retryable": error.retryable},
         ) from error
 
-    card_id = uuid.uuid4().hex
+    card_id = new_card_id()
     folder: Path = card_output_dir() / card_id
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "illustration.png").write_bytes(illustration)
