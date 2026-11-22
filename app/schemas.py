@@ -99,7 +99,7 @@ class CharacterParameters(BaseModel):
     disposition_candidates: list[str]
     # GPT가 참고해 조정하는 기본 능력치
     base_stats: Stats
-    # 이름의 바탕이 될 낱말 4개(의태어 2 + 장소별 간식·작은 물건 2). 참가자마다 달라서 이름이 겹치지 않게 한다.
+    # 이름 수식어 후보 3개(예: 보송보송한). 이름은 "수식어 + 종족" 형식이며 참가자마다 무작위로 뽑는다.
     name_hints: list[str] = []
     # 실제 동물 캐릭터만: 참가자와 닮게 옮길 얼굴 생김새 문구 (인외 캐릭터는 비어 있다)
     face_traits: list[str] = []

@@ -15,6 +15,7 @@
   - 2026-11-22 일러스트를 정보 패널 위 영역에만 배치해 캐릭터가 패널에 가려지지 않게 변경, 패널 뒤는 흐린 그림으로 채움
   - 2026-11-22 그림이 뿌옇게 보이던 문제 수정: 그림 전체 무지개 막을 없애고 광택은 가늘고 약하게, 반짝이는 가장자리에만 적게
   - 2026-11-22 카드 번호를 카드 ID의 끝 4자리로 변경 (ID가 생성 시각으로 시작하게 바뀜)
+  - 2026-11-22 긴 이름('~한 + 종족')은 말줄임 대신 글자 크기를 줄여 넣고, 이름에 종족이 있으면 아래 줄에서 종족을 뺌
 """
 
 import colorsys
@@ -342,13 +343,22 @@ def compose_card(
     label_right = number_right - draw.textlength(number, font=number_font) - 10
     _outlined(draw, (label_right, y + 104), STAT_LABELS[top_key], label_font, GOLD, stroke=3, anchor="rs")
 
-    name_font = _font(80, 900)
     name_room = label_right - draw.textlength(STAT_LABELS[top_key], font=label_font) - PAD - 24
+    # 이름이 길면 말줄임 대신 글자를 줄인다 (80 → 최소 48)
+    name_size = 80
+    while name_size > 48 and draw.textlength(character.name, font=_font(name_size, 900)) > name_room:
+        name_size -= 4
+    name_font = _font(name_size, 900)
     _outlined(draw, (PAD, y + 120), _fit(draw, character.name, name_font, name_room), name_font, stroke=6, anchor="ls")
+    subtitle = (
+        f"{character.element} 속성"
+        if character.race in character.name
+        else f"{character.race} · {character.element} 속성"
+    )
     _outlined(
         draw,
         (PAD, y + 140),
-        _fit(draw, f"{character.race} · {character.element} 속성", _font(30, 700), CONTENT),
+        _fit(draw, subtitle, _font(30, 700), CONTENT),
         _font(30, 700),
         (235, 230, 255),
         stroke=3,

@@ -42,7 +42,7 @@ branch = _git("branch", "--show-current")
 
 # 생성한 카드가 없는 팀원도 실행할 수 있도록 넣어 둔 예시 (실제 생성 결과에서 가져옴)
 SAMPLE = {
-    "name": "몽실이",
+    "name": "몽실몽실한 수달",
     "race": "수달",
     "element": "물안개",
     "disposition": "물결 따라 천천히 길을 찾는 수달",
@@ -204,7 +204,7 @@ ul {{ margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 75ch }}
   <a href="#image">③ 일러스트</a>
   <div class="label">프롬프트에 들어가는 재료</div>
   <a href="#traits">얼굴 생김새 문구</a>
-  <a href="#roles">무작위 재료 (동물·이름 낱말)</a>
+  <a href="#roles">무작위 재료 (동물·이름 수식어)</a>
   <a href="#models">모델과 환경변수</a>
 </nav>
 
@@ -265,14 +265,13 @@ ul {{ margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 75ch }}
 </section>
 
 <section id="roles">
-  <h2>무작위 재료 (동물·이름 낱말)</h2>
+  <h2>무작위 재료 (동물·이름 수식어)</h2>
   <p>아래 재료는 응답이나 얼굴로 정하지 않고 <b>참가자마다 매번 무작위로</b> 뽑아 ②에 보냅니다. 같은 사람이 다시 해도 다르게 나옵니다.</p>
   <h3>실제 동물 후보 (<code>ANIMAL_POOL</code>, {len(P.ANIMAL_POOL)}종 중 {P.ANIMAL_CANDIDATE_COUNT}개)</h3>
   <p class="meta">{e(" ".join(P.ANIMAL_POOL))}</p>
-  <h3>이름 낱말 (<code>name_hints</code>, 의태어 {P.NAME_HINT_COUNT[0]}개 + 간식·작은 물건 {P.NAME_HINT_COUNT[1]}개)</h3>
-  <p>GPT가 그중 하나를 바탕으로 애칭을 짓습니다. 예시 입력의 낱말: <code>{e(" · ".join(params.name_hints))}</code></p>
-  <p class="meta">의태어: {e(" ".join(P.NAME_MIMETIC))}</p>
-  <p class="meta">간식·작은 물건: {e(" ".join(P.NAME_THINGS))}</p>
+  <h3>이름 수식어 (<code>name_hints</code>, {len(P.NAME_MODIFIERS)}개 중 {P.NAME_HINT_COUNT}개)</h3>
+  <p>이름은 "수식어 + 종족"(예: 보송보송한 토끼) 형식이고, GPT가 이 중 하나를 그대로 수식어로 씁니다. 예시 입력: <code>{e(" · ".join(params.name_hints))}</code></p>
+  <p class="meta">{e(" ".join(P.NAME_MODIFIERS))}</p>
 </section>
 
 <section id="models">
