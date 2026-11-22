@@ -3,7 +3,7 @@
 
 역할: 캐릭터 정보와 일러스트를 100×148mm(300dpi) 세로 풀아트 홀로그램 카드 PNG 한 장으로 합성한다.
 비고: SELPHY CP1500 엽서 크기(100×148mm)에 맞췄다. 인쇄는 아직 연결하지 않았고 파일로만 저장한다.
-      템플릿 구성: 일러스트가 카드 전체를 채우고, 무지개 홀로 포일 테두리와 광택·반짝이를 겹친 뒤,
+      템플릿 구성: 일러스트는 정보 패널 위 영역(ART_BOX)을 채우고 패널 뒤는 같은 그림을 흐리게 깔아 풀아트처럼 보이게 하며, 무지개 홀로 포일 테두리와 광택·반짝이를 겹친 뒤,
       위쪽에 이름·종족·대표 능력치, 아래쪽 유리 패널에 고유 능력·능력치·럭키 아이템·2027년 메시지·등급·카드 번호를 얹는다.
       반짝이 위치는 카드 번호로 정해서 카드마다 다르게 나온다. 같은 번호면 늘 같은 카드가 나온다.
       한글 글꼴은 CARD_FONT 환경변수로 바꿀 수 있다. 지정하지 않으면 macOS 기본 글꼴을 찾아 쓴다.
@@ -12,6 +12,7 @@
   - 2026-11-22 최초 작성
   - 2026-11-22 트레이딩 카드 디자인으로 변경 (대표 능력치, 고유 능력 칸, 카드 번호, 등급 별)
   - 2026-11-22 풀아트 홀로그램 템플릿으로 변경 (전면 일러스트, 홀로 포일 테두리, 반짝이, 유리 패널, 1/1 표기)
+  - 2026-11-22 일러스트를 정보 패널 위 영역에만 배치해 캐릭터가 패널에 가려지지 않게 변경, 패널 뒤는 흐린 그림으로 채움
 """
 
 import colorsys
@@ -31,6 +32,10 @@ WIDTH, HEIGHT = 1181, 1748
 FRAME = 30  # 홀로 포일 테두리 두께
 RADIUS = 56
 PAD = 72  # 카드 가장자리에서 글자까지
+# 정보 패널이 시작하는 높이. 일러스트는 이 위에만 선명하게 배치해 캐릭터가 패널에 가려지지 않게 한다.
+PANEL_TOP = HEIGHT - FRAME - 566
+# 선명한 일러스트가 끝나는 높이 (패널 모서리 아래로 살짝 들어가 경계가 자연스럽게 보이게 한다)
+ART_BOTTOM = PANEL_TOP + 40
 CONTENT = WIDTH - PAD * 2
 
 WHITE = (255, 255, 255)
@@ -239,8 +244,13 @@ def compose_card(
     stars = rarity(character)
     rarity_name, rarity_color = RARITIES[stars]
 
-    # 1) 전면 일러스트
-    card = _cover(Image.open(io.BytesIO(illustration_png)).convert("RGB"), size)
+    # 1) 일러스트: 패널 뒤까지 흐린 그림을 깔고, 패널 위 영역에만 선명한 그림을 얹는다
+    art = Image.open(io.BytesIO(illustration_png)).convert("RGB")
+    card = _cover(art, size).filter(ImageFilter.GaussianBlur(28))
+    card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.35)
+    sharp = _cover(art, (WIDTH, ART_BOTTOM))
+    fade = _vertical_fade((WIDTH, ART_BOTTOM), [(0, 255), ((PANEL_TOP - 30) / ART_BOTTOM, 255), (1, 0)])
+    card.paste(sharp, (0, 0), fade)
 
     # 2) 홀로 광택: 무지개를 은은하게 덮고, 비스듬한 빛줄기를 더한다
     rainbow = _rainbow(size, offset=rng.random())
@@ -252,7 +262,11 @@ def compose_card(
     # 3) 글자가 읽히도록 위아래를 어둡게
     shade = Image.new("RGB", size, SHADOW)
     card = Image.composite(
-        shade, card, _vertical_fade(size, [(0, 175), (0.17, 0), (0.55, 0), (0.68, 205), (1, 235)])
+        shade,
+        card,
+        _vertical_fade(
+            size, [(0, 175), (0.17, 0), ((PANEL_TOP - 120) / HEIGHT, 0), (PANEL_TOP / HEIGHT, 150), (1, 235)]
+        ),
     )
     card = card.convert("RGBA")
 
@@ -335,7 +349,7 @@ def compose_card(
     )
 
     # 7) 아래쪽 유리 패널
-    panel_top = HEIGHT - FRAME - 566
+    panel_top = PANEL_TOP
     panel = (FRAME + 26, panel_top, WIDTH - FRAME - 26, HEIGHT - FRAME - 26)
     glass = Image.new("RGBA", size, (0, 0, 0, 0))
     glass_draw = ImageDraw.Draw(glass)

@@ -14,6 +14,8 @@
   - 2026-11-22 참가자 얼굴이 반영된 생김새 특징(art_features)을 프롬프트에 추가
   - 2026-11-22 애니메이션 캐릭터를 사람이 아닌 캐릭터로만 그리도록 변경
   - 2026-11-22 이미지 생성 오류를 서버 로그에 남기도록 추가
+  - 2026-11-22 손 모양(hand_gestures)을 글로 바꿔 프롬프트에 추가, 뼈대 설명에 손가락 추가
+  - 2026-11-22 카드가 그림을 패널 위에만 배치하도록 바뀌어 정사각 구도로 변경, 손과 몸이 화면 안에 들어오도록 지시
 """
 
 import base64
@@ -22,14 +24,14 @@ import os
 
 import openai
 
-from app.schemas import CharacterResponse
+from app.schemas import CharacterResponse, HandGesture
 from app.services.parameters import CHARACTER_TYPES
 
 # 부스 대기 시간이 중요해서 빠른 모델과 중간 품질을 기본값으로 쓴다
 DEFAULT_MODEL = "gpt-image-2.5-flare"
 DEFAULT_QUALITY = "medium"
-# 카드 전체를 채우는 세로 구도 (카드 100×148mm와 비슷한 2:3)
-SIZE = "1024x1536"
+# 카드의 정보 패널 위 영역(1181×1152)이 거의 정사각이라 정사각으로 그린다
+SIZE = "1024x1024"
 
 STYLES = {
     "nonhuman": (
@@ -57,13 +59,36 @@ class IllustrationError(Exception):
 
 POSE_INSTRUCTIONS = (
     "첨부한 그림은 참가자가 의자에 앉아 취한 상반신 자세를 흰 바탕에 막대 뼈대로 나타낸 것이다. "
-    "둥근 원은 머리, 선은 어깨·팔·손·몸통이다. 캐릭터가 이 자세를 그대로 따르게 그린다: "
-    "어깨 기울기, 양팔과 손의 높이와 방향, 고개 기울기를 맞춘다. 왼쪽과 오른쪽도 그림 그대로 둔다. "
+    "둥근 원은 머리, 굵은 선은 어깨·팔·몸통, 가는 선과 점은 손가락 관절이다. 캐릭터가 이 자세를 그대로 따르게 그린다: "
+    "어깨 기울기, 양팔과 손의 높이와 방향, 손가락을 펴고 접은 모양, 고개 기울기를 맞춘다. 왼쪽과 오른쪽도 그림 그대로 둔다. "
     "뼈대의 선, 점, 흰 바탕은 결과 그림에 남기지 않는다."
 )
 
 
-def build_prompt(character: CharacterResponse, *, with_pose: bool = False) -> str:
+# 손 모양 코드 -> 프롬프트 문장. 코드만 받으므로 참가자가 글을 넣을 수 없다.
+GESTURE_TEXT = {
+    "Closed_Fist": "주먹을 쥔 손",
+    "Open_Palm": "손가락을 모두 활짝 편 손바닥",
+    "Pointing_Up": "검지 하나만 펴서 위를 가리키는 손",
+    "Thumb_Down": "엄지만 펴서 아래로 향한 손",
+    "Thumb_Up": "엄지만 펴서 위로 치켜든 손(엄지 척)",
+    "Victory": "검지와 중지만 펴서 V자를 만든 손(브이)",
+    "ILoveYou": "엄지·검지·새끼손가락만 편 손",
+}
+SIDE_TEXT = {"left": "그림의 왼쪽 손", "right": "그림의 오른쪽 손"}
+
+
+def gesture_line(hand_gestures: list[HandGesture]) -> str:
+    parts = [f"{SIDE_TEXT[hand.side]}은 {GESTURE_TEXT[hand.gesture]}" for hand in hand_gestures]
+    return f"손 모양: {', '.join(parts)}. 손가락 개수와 모양을 정확하게 그린다."
+
+
+def build_prompt(
+    character: CharacterResponse,
+    *,
+    with_pose: bool = False,
+    hand_gestures: list[HandGesture] | None = None,
+) -> str:
     parameters = character.parameters
     # parameters.character_type 에는 키(nonhuman)가 아니라 설명 문구가 들어 있다
     type_key = next(
@@ -89,16 +114,17 @@ def build_prompt(character: CharacterResponse, *, with_pose: bool = False) -> st
         ]
     return "\n".join(
         [
-            "풀아트 홀로그램 트레이딩 카드의 전면 일러스트 한 장을 세로 구도로 그려라.",
+            "홀로그램 트레이딩 카드에 들어갈 캐릭터 일러스트 한 장을 정사각 구도로 그려라.",
             f"스타일: {style}",
             *anime_lines,
             f"캐릭터: {character.race}, 속성은 {character.element}.",
             f"외형: {character.appearance}",
             f"색감: {character.palette}",
             f"배경: {parameters.realm}을 은은하게 표현한다.",
-            "구도: 캐릭터 한 명이 화면 가운데에서 역동적인 자세로 선다. 머리는 위에서 20% 아래에 오게 하고, "
-            "화면 아래 3분의 1은 캐릭터의 다리와 배경으로 채운다(나중에 글자 패널이 덮는다).",
+            "구도: 캐릭터 한 명이 화면 가운데에 크게 선다. 머리 위로 화면의 약 15%를 비워 두고(제목 자리), "
+            "머리, 양손, 몸이 모두 화면 안에 들어오게 그려 어느 부분도 화면 밖으로 잘리지 않게 한다.",
             *([f"자세: {POSE_INSTRUCTIONS}"] if with_pose else []),
+            *([gesture_line(hand_gestures)] if hand_gestures else []),
             "연출: 화려한 빛, 반짝이는 입자, 배경과 어우러지는 극적인 조명.",
             "글자, 숫자, 로고, 워터마크, 카드 테두리를 넣지 않는다.",
             "모든 연령이 보는 행사용이므로 잔인하거나 선정적인 요소를 넣지 않는다.",
@@ -111,10 +137,14 @@ def _build_client() -> openai.OpenAI:
     return openai.OpenAI(timeout=120.0, max_retries=1)
 
 
-def generate_illustration(character: CharacterResponse, pose_png: bytes | None = None) -> bytes:
+def generate_illustration(
+    character: CharacterResponse,
+    pose_png: bytes | None = None,
+    hand_gestures: list[HandGesture] | None = None,
+) -> bytes:
     options = {
         "model": os.getenv("OPENAI_IMAGE_MODEL", DEFAULT_MODEL),
-        "prompt": build_prompt(character, with_pose=pose_png is not None),
+        "prompt": build_prompt(character, with_pose=pose_png is not None, hand_gestures=hand_gestures),
         "size": SIZE,
         "quality": os.getenv("OPENAI_IMAGE_QUALITY", DEFAULT_QUALITY),
         "output_format": "png",

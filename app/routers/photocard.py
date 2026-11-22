@@ -8,6 +8,7 @@
 수정 이력:
   - 2026-11-22 최초 작성
   - 2026-11-22 요청 형식을 {character, pose_skeleton}으로 바꾸고 포즈 뼈대 그림 검증 추가
+  - 2026-11-22 손 모양(hand_gestures)을 일러스트 생성에 전달
 """
 
 import base64
@@ -56,7 +57,7 @@ def create_photocard(req: PhotocardRequest):
     character = req.character
     pose = _pose_png(req.pose_skeleton) if req.pose_skeleton else None
     try:
-        illustration = generate_illustration(character, pose)
+        illustration = generate_illustration(character, pose, req.hand_gestures)
     except IllustrationError as error:
         raise HTTPException(
             status_code=503 if error.retryable else 500,

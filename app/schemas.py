@@ -14,6 +14,7 @@
   - 2026-11-22 애니메이션 캐릭터용 화풍(art_style)과 얼굴 생김새(face_traits) 추가
   - 2026-11-22 얼굴 생김새가 반영된 생김새 특징(art_features) 추가
   - 2026-11-22 이름 음절(name_sounds) 추가
+  - 2026-11-22 포토카드 요청에 손 모양(hand_gestures) 추가
 """
 
 from typing import Literal
@@ -127,12 +128,21 @@ class CharacterResponse(AiDecision):
     parameters: CharacterParameters
 
 
+class HandGesture(BaseModel):
+    """손 모양. 화면(거울 모드)과 뼈대 그림 기준 왼쪽·오른쪽 손. 자유 글 대신 정해진 코드만 받는다."""
+
+    side: Literal["left", "right"]
+    gesture: Literal["Closed_Fist", "Open_Palm", "Pointing_Up", "Thumb_Down", "Thumb_Up", "Victory", "ILoveYou"]
+
+
 class PhotocardRequest(BaseModel):
     """포토카드 생성 요청. 포즈 뼈대는 얼굴 없이 관절만 이은 그림이며 없으면 자유 자세로 그린다."""
 
     character: CharacterResponse
     # base64 PNG (data:image/png;base64, 접두어 허용). 512×768 그림이면 수십 KB 정도다.
     pose_skeleton: str | None = Field(default=None, max_length=2_000_000)
+    # 손마다 하나씩, 최대 2개
+    hand_gestures: list[HandGesture] = Field(default=[], max_length=2)
 
 
 class PhotocardResponse(BaseModel):
