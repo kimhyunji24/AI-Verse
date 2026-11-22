@@ -13,6 +13,7 @@
   - 2026-11-22 트레이딩 카드 디자인으로 변경 (대표 능력치, 고유 능력 칸, 카드 번호, 등급 별)
   - 2026-11-22 풀아트 홀로그램 템플릿으로 변경 (전면 일러스트, 홀로 포일 테두리, 반짝이, 유리 패널, 1/1 표기)
   - 2026-11-22 일러스트를 정보 패널 위 영역에만 배치해 캐릭터가 패널에 가려지지 않게 변경, 패널 뒤는 흐린 그림으로 채움
+  - 2026-11-22 그림이 뿌옇게 보이던 문제 수정: 그림 전체 무지개 막을 없애고 광택은 가늘고 약하게, 반짝이는 가장자리에만 적게
 """
 
 import colorsys
@@ -36,6 +37,8 @@ PAD = 72  # 카드 가장자리에서 글자까지
 PANEL_TOP = HEIGHT - FRAME - 566
 # 선명한 일러스트가 끝나는 높이 (패널 모서리 아래로 살짝 들어가 경계가 자연스럽게 보이게 한다)
 ART_BOTTOM = PANEL_TOP + 40
+# 그림 위를 지나가는 빛줄기 세기 (0~1). 높이면 홀로 느낌이 세지지만 그림이 바랜다.
+GLOSS_STRENGTH = 0.3
 CONTENT = WIDTH - PAD * 2
 
 WHITE = (255, 255, 255)
@@ -252,11 +255,10 @@ def compose_card(
     fade = _vertical_fade((WIDTH, ART_BOTTOM), [(0, 255), ((PANEL_TOP - 30) / ART_BOTTOM, 255), (1, 0)])
     card.paste(sharp, (0, 0), fade)
 
-    # 2) 홀로 광택: 무지개를 은은하게 덮고, 비스듬한 빛줄기를 더한다
+    # 2) 홀로 광택: 그림이 뿌옇게 바래지 않도록 그림 위에는 무지개 막을 씌우지 않고,
+    #    비스듬한 빛줄기만 약하게 지나가게 한다. 홀로 느낌은 테두리·배지·문장(紋章)이 맡는다.
     rainbow = _rainbow(size, offset=rng.random())
-    holo = ImageChops.screen(card, rainbow)
-    card = Image.composite(holo, card, Image.new("L", size, 46 + 20 * stars))
-    gloss = _gloss(size)
+    gloss = _gloss(size).point(lambda value: round(value * GLOSS_STRENGTH))
     card = Image.composite(ImageChops.screen(card, rainbow), card, gloss)
 
     # 3) 글자가 읽히도록 위아래를 어둡게
@@ -274,18 +276,21 @@ def compose_card(
     sparkles = Image.new("RGBA", size, (0, 0, 0, 0))
     sparkle_draw = ImageDraw.Draw(sparkles)
     points = []
-    while len(points) < 18 + 8 * stars:
-        x, y = rng.uniform(FRAME + 20, WIDTH - FRAME - 20), rng.uniform(FRAME + 20, HEIGHT * 0.66)
+    while len(points) < 6 + 4 * stars:
+        x, y = rng.uniform(FRAME + 20, WIDTH - FRAME - 20), rng.uniform(FRAME + 20, PANEL_TOP - 20)
         # 이름과 대표 능력치 글자 위에는 반짝이를 올리지 않는다
         if y < FRAME + 300 and (x < WIDTH * 0.55 or x > WIDTH * 0.62):
             continue
-        points.append((x, y, rng.uniform(8, 30)))
+        # 캐릭터가 있는 가운데에는 올리지 않고 가장자리에만 둔다
+        if WIDTH * 0.22 < x < WIDTH * 0.78 and y > FRAME + 260:
+            continue
+        points.append((x, y, rng.uniform(7, 22)))
     for x, y, r in points:
-        sparkle_draw.ellipse((x - r * 1.2, y - r * 1.2, x + r * 1.2, y + r * 1.2), fill=(255, 255, 255, 70))
+        sparkle_draw.ellipse((x - r * 1.2, y - r * 1.2, x + r * 1.2, y + r * 1.2), fill=(255, 255, 255, 55))
     sparkles = sparkles.filter(ImageFilter.GaussianBlur(10))
     sparkle_draw = ImageDraw.Draw(sparkles)
     for x, y, r in points:
-        _sparkle(sparkle_draw, (x, y), r, (255, 255, 255, 235))
+        _sparkle(sparkle_draw, (x, y), r, (255, 255, 255, 210))
     card.alpha_composite(sparkles)
 
     # 5) 홀로 포일 테두리 + 안쪽 가는 금선
