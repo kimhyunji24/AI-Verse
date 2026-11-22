@@ -19,11 +19,16 @@
   - 2026-11-22 애니메이션 캐릭터 후보를 사람 직업에서 생물 종류로 교체
   - 2026-11-22 이름이 겹치지 않도록 참가자마다 다른 이름 음절(name_sounds) 추가
   - 2026-11-22 뜻 없는 음절 대신 뜻이 있는 이름 낱말(name_hints: 의태어 + 장소별 간식·작은 물건)로 변경
+  - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체: 참고 캐릭터·화풍 표 삭제, 종족 후보를 실제 동물로
+  - 2026-11-22 동물 종류와 이름 낱말을 입력에 따라 정하던 표 대신 매번 무작위로 뽑도록 변경
 """
 
-import zlib
+import random
 
 from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
+
+# 무작위로 뽑는 재료(동물 종류, 이름 낱말)에 쓴다. 참가자마다 매번 달라진다.
+_random = random.SystemRandom()
 
 # 3단계 분류 기준값: (이 값 미만이면 0단계, 이 값 초과면 2단계, 사이는 1단계)
 THRESHOLDS = {
@@ -74,69 +79,24 @@ WISHES = {
 
 CHARACTER_TYPES = {
     "nonhuman": "머리가 사물인 인외 캐릭터",
-    "anime": "애니메이션 캐릭터",
+    "animal": "실제 동물 캐릭터",
 }
 
-# 애니메이션 캐릭터의 화풍을 뽑을 참고 캐릭터. 이름은 화풍 추출(services/art_style.py)에만 쓰고,
-# 응답·카드·이미지 프롬프트에는 넣지 않는다. 순서는 아래 ART_STYLES(대체용 화풍 글)와 맞춘다.
-# 인외 콘셉트라 사람 캐릭터는 넣지 않는다.
-ART_REFERENCES = (
-    "먼작귀(치이카와)의 치이카와",
-    "포켓몬스터의 피카츄",
-    "별의 커비의 커비",
-    "산리오의 마이멜로디",
-    "이웃집 토토로의 토토로",
-    "몰랑이의 몰랑이",
-)
-# 추출 결과에 나오면 안 되는 고유 이름. "원피스"(옷)처럼 일반 낱말과 겹치는 이름은 넣지 않는다.
-ART_REFERENCE_NAMES = {
-    ART_REFERENCES[0]: ("치이카와", "먼작귀"),
-    ART_REFERENCES[1]: ("피카츄", "포켓몬"),
-    ART_REFERENCES[2]: ("커비",),
-    ART_REFERENCES[3]: ("마이멜로디", "산리오"),
-    ART_REFERENCES[4]: ("토토로",),
-    ART_REFERENCES[5]: ("몰랑이",),
-}
-
-# 대체용 화풍 글: 화풍 추출이 실패하면 쓴다. 위 참고 캐릭터의 화풍을 미리 글로 뽑아 둔 것이며 작품 이름은 쓰지 않는다.
-ART_STYLES = (
-    "2등신의 작고 말랑한 동물 캐릭터. 동글동글한 몸, 짧은 팔다리, 작은 점 같은 눈, 분홍 볼터치, "
-    "굵고 부드러운 손그림 외곽선, 연한 파스텔 채색",
-    "몬스터 수집 게임풍 작은 생물. 단순하고 또렷한 실루엣, 짧은 팔다리, 큰 눈과 볼 무늬, 선명한 단색 몸과 포인트 색, "
-    "깔끔한 외곽선과 셀 채색",
-    "공처럼 동그란 몸 하나로 된 생물. 얼굴과 몸의 구분이 없고, 아주 짧은 팔과 큰 발, 세로로 긴 타원 눈, "
-    "부드러운 파스텔 단색과 은은한 그러데이션",
-    "둥근 마스코트 캐릭터풍. 커다랗고 동그란 머리와 작은 몸, 단순한 도형으로 된 이목구비, 작은 리본이나 모자 소품, "
-    "평면적인 단색 채색",
-    "숲속 정령 같은 큰 생물. 푹신한 털, 넓은 배, 작고 동그란 눈, 크레용과 수채가 섞인 따뜻한 질감",
-    "말랑한 찹쌀떡 같은 작은 생물. 흘러내리듯 둥근 몸, 아주 단순한 점 눈과 작은 입, 하얀 몸에 연한 파스텔 포인트, "
-    "얇고 부드러운 선",
-)
-# 화풍 고르기: 응답(갖고 싶은 힘) × 실루엣 단계 -> ART_REFERENCES / ART_STYLES 번호
-# 같은 실루엣 단계 안에서는 힘마다 화풍이 모두 다르도록 배치했다
-ART_STYLE_TABLE = {
-    "read_minds": (4, 2, 3),
-    "stop_time": (0, 4, 2),
-    "fly": (1, 3, 0),
-    "transform": (5, 0, 1),
-}
-
-# 이름 낱말: 뜻이 있는 낱말을 참가자마다 골라 주고, GPT가 그중 하나로 애칭을 짓게 한다.
+# 이름 낱말: 뜻이 있는 낱말을 참가자마다 무작위로 골라 주고, GPT가 그중 하나로 애칭을 짓게 한다.
 # (뜻 없는 음절을 주면 "부쿠루"처럼 아무 뜻 없는 이름이 나온다.)
-# 같은 입력이면 늘 같은 낱말이 나오고, 참가자마다 달라 이름이 겹치지 않는다.
 NAME_MIMETIC = (
     "몽실", "뽀송", "말랑", "보들", "포동", "동글", "폭신", "쫀득", "꼬물", "몰랑", "뭉게", "토실",
     "보송", "옹알", "꼬마", "콩닥", "방울", "살랑", "아롱", "또롱",
 )
-NAME_THINGS = {
-    "deep_sea": ("진주", "소라", "조약돌", "물방울", "미역", "해초", "모래", "산호", "조개", "물결"),
-    "night_sky": ("별사탕", "달떡", "솜사탕", "구름빵", "꿀별", "은하수", "새벽", "달빛", "유성", "오로라"),
-    "old_library": ("책갈피", "단추", "연필", "쿠키", "잉크", "도장", "종이배", "깃털", "양초", "열쇠"),
-    "neon_city": ("젤리", "팝콘", "사이다", "픽셀", "네온", "캔디", "콜라", "버블티", "전구", "스티커"),
-}
-NAME_HINT_COUNT = (2, 2)  # (의태어, 장소 낱말)
+NAME_THINGS = (
+    "진주", "소라", "조약돌", "물방울", "미역", "모래", "산호", "조개", "별사탕", "달떡",
+    "솜사탕", "구름빵", "꿀별", "은하수", "새벽", "달빛", "책갈피", "단추", "연필", "쿠키",
+    "잉크", "도장", "종이배", "깃털", "젤리", "팝콘", "사이다", "캔디", "버블티", "스티커",
+    "콩떡", "찹쌀떡", "마카롱", "푸딩", "식빵", "호떡", "감자", "고구마", "도토리", "밤톨",
+)
+NAME_HINT_COUNT = (2, 2)  # (의태어, 간식·작은 물건)
 
-# 애니메이션 캐릭터 얼굴에 옮길 생김새: 점수가 0.5에서 이만큼 벗어나면 (낮을 때, 높을 때) 문구를 쓴다.
+# 실제 동물 캐릭터 얼굴에 옮길 생김새: 점수가 0.5에서 이만큼 벗어나면 (낮을 때, 높을 때) 문구를 쓴다.
 # 좋고 나쁨이 없는 생김새 묘사만 쓴다.
 FACE_TRAIT_THRESHOLD = 0.15
 FACE_TRAITS = {
@@ -161,15 +121,16 @@ NONHUMAN_RACES = {
     "neon_city": (("자판기 머리", "게임기 머리"), ("브라운관 TV 머리", "헤드폰 머리"), ("네온사인 머리", "신호등 머리")),
 }
 
-# 애니메이션 캐릭터(사람이 아닌 생물)의 종류 후보: 응답(장소) × 실루엣 단계별 2개
-# 실루엣: 넓게 퍼지는(동글·통통) / 균형 / 길게 뻗는(늘씬·긴 꼬리)
-ANIME_ROLES = {
-    "deep_sea": (("방울해파리", "조약돌게"), ("물결수달", "산호해마"), ("꼬리고래", "리본장어")),
-    "night_sky": (("별사탕햄스터", "달토끼"), ("구름고양이", "별똥다람쥐"), ("은하여우", "밤하늘부엉이")),
-    "old_library": (("책벌레쥐", "잉크고슴도치"), ("책갈피펭귄", "촛불너구리"), ("두루마리족제비", "고서올빼미")),
-    "neon_city": (("픽셀병아리", "네온개구리"), ("배터리강아지", "전구오리"), ("홀로그램고양이", "네온라쿤")),
-}
-RACE_TABLES = {"nonhuman": NONHUMAN_RACES, "anime": ANIME_ROLES}
+# 실제 동물 캐릭터의 종류 후보: 응답이나 얼굴로 정하지 않고 참가자마다 이 풀에서 무작위로 뽑는다.
+ANIMAL_POOL = (
+    "수달", "해달", "물범", "복어", "펭귄", "돌고래", "해마", "거북",
+    "햄스터", "토끼", "다람쥐", "날다람쥐", "고슴도치", "친칠라", "기니피그", "족제비",
+    "고양이", "강아지", "시바견", "퍼그", "여우", "사막여우", "너구리", "라쿤",
+    "레서판다", "판다", "코알라", "나무늘보", "알파카", "양", "아기돼지", "카피바라",
+    "부엉이", "올빼미", "참새", "앵무새", "오리", "병아리", "청개구리", "카멜레온",
+)
+ANIMAL_CANDIDATE_COUNT = 3
+RACE_TABLES = {"nonhuman": NONHUMAN_RACES}
 
 # 속성 후보: 기운 단계 × 시선 단계
 ELEMENTS = (
@@ -318,13 +279,6 @@ def _base_stats(features: FaceFeatures, answers: Answers, scores: dict[str, floa
     return Stats(**stats)
 
 
-def art_reference(features: FaceFeatures, answers: Answers) -> str | None:
-    """애니메이션 캐릭터면 화풍을 뽑을 참고 캐릭터 이름을, 아니면 None을 돌려준다."""
-    if answers.character_type != "anime":
-        return None
-    return ART_REFERENCES[ART_STYLE_TABLE[answers.power][_tier(features, "face_aspect_ratio")]]
-
-
 def _face_traits(scores: dict[str, float]) -> list[str]:
     """0.5에서 많이 벗어난 순서로 생김새 문구를 고른다."""
     ranked = sorted(FACE_TRAITS, key=lambda name: abs(scores[name] - 0.5), reverse=True)
@@ -336,20 +290,9 @@ def _face_traits(scores: dict[str, float]) -> list[str]:
     return [FACE_TRAITS[name][scores[name] >= 0.5] for name in picked]
 
 
-def _pick(pool: tuple[str, ...], count: int, seed: int) -> list[str]:
-    picked: list[str] = []
-    while len(picked) < count:
-        word = pool[seed % len(pool)]
-        if word not in picked:
-            picked.append(word)
-        seed = seed // len(pool) + 7919 * (len(picked) + 1)
-    return picked
-
-
-def _name_hints(features: FaceFeatures, answers: Answers) -> list[str]:
-    seed = zlib.crc32((features.model_dump_json() + answers.model_dump_json()).encode())
+def _name_hints() -> list[str]:
     mimetic, things = NAME_HINT_COUNT
-    return _pick(NAME_MIMETIC, mimetic, seed) + _pick(NAME_THINGS[answers.place], things, seed // 97)
+    return _random.sample(NAME_MIMETIC, mimetic) + _random.sample(NAME_THINGS, things)
 
 
 def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParameters:
@@ -360,11 +303,11 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
     eye_gap = _tier(features, "inner_eye_gap_ratio")
     scores = _face_scores(features)
 
-    races = RACE_TABLES[answers.character_type][answers.place]
+    animal = answers.character_type == "animal"
+    races = None if animal else RACE_TABLES[answers.character_type][answers.place]
     near_silhouette = _nearest_other_tier(features, "face_aspect_ratio", silhouette)
     near_gaze = _nearest_other_tier(features, "eye_spacing_ratio", gaze)
     near_presence = _nearest_other_tier(features, "jaw_width_ratio", presence)
-    anime = answers.character_type == "anime"
 
     return CharacterParameters(
         face_scores=scores,
@@ -380,7 +323,11 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
         lucky_item_type=LUCKY_ITEM_TYPES[answers.bag],
         palette=PALETTES[answers.time_of_day][eye_gap],
         ability=ABILITIES[answers.power],
-        race_candidates=[*races[silhouette], races[near_silhouette][0]],
+        race_candidates=(
+            _random.sample(ANIMAL_POOL, ANIMAL_CANDIDATE_COUNT)
+            if animal
+            else [*races[silhouette], races[near_silhouette][0]]
+        ),
         element_candidates=[
             ELEMENTS[presence][gaze],
             ELEMENTS[presence][near_gaze],
@@ -391,7 +338,6 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
             DISPOSITIONS[answers.companion][near_gaze],
         ],
         base_stats=_base_stats(features, answers, scores),
-        name_hints=_name_hints(features, answers),
-        art_style=ART_STYLES[ART_STYLE_TABLE[answers.power][silhouette]] if anime else "",
-        face_traits=_face_traits(scores) if anime else [],
+        name_hints=_name_hints(),
+        face_traits=_face_traits(scores) if animal else [],
     )

@@ -11,6 +11,7 @@
   - 2026-11-22 생김새 특징이 프롬프트에 들어가는지 확인 추가
   - 2026-11-22 손 모양 확인 추가
   - 2026-11-22 카드 ID가 생성 시각 형식인지 확인 추가
+  - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체
 """
 
 import base64
@@ -92,7 +93,7 @@ def test_prompt_uses_character_text_only(client, openai_server):
 
 @pytest.mark.parametrize(
     "character_type, expected",
-    [("nonhuman", "머리 자리에 사물"), ("anime", "기존 작품의 캐릭터와 구별되는 오리지널")],
+    [("nonhuman", "머리 자리에 사물"), ("animal", "실제 동물 한 마리를 사진처럼 사실적으로")],
 )
 def test_prompt_follows_character_type(client, openai_server, character_type, expected):
     photocard(client, make_character(client, character_type=character_type))
@@ -165,24 +166,6 @@ def test_invalid_pose_is_rejected_before_calling_ai(client, openai_server, pose)
     assert image_requests(openai_server) == []
 
 
-def test_anime_prompt_has_art_style_and_face_traits(client, openai_server):
-    character = make_character(client, character_type="anime")
-    photocard(client, character)
-    [request] = image_requests(openai_server)
-    assert character["parameters"]["art_style"] in request["prompt"]
-    for trait in character["parameters"]["face_traits"]:
-        assert trait in request["prompt"]
-    for feature in character["parameters"]["art_features"]:
-        assert feature in request["prompt"]
-    assert character["parameters"]["art_features"]
-
-
-def test_anime_prompt_forbids_humans(client, openai_server):
-    photocard(client, make_character(client, character_type="anime"))
-    [request] = image_requests(openai_server)
-    assert "사람이나 사람 모습의 인물로 그리지 않는다" in request["prompt"]
-
-
 def test_hand_gestures_become_prompt_text(client, openai_server):
     hands = [{"side": "left", "gesture": "Victory"}, {"side": "right", "gesture": "Thumb_Up"}]
     response = photocard(client, make_character(client), skeleton_png(), hands)
@@ -218,3 +201,13 @@ def test_card_id_starts_with_creation_time(client, openai_server):
     card_id = photocard(client, make_character(client)).json()["card_id"]
     assert re.fullmatch(r"\d{8}-\d{6}-[0-9a-f]{4}", card_id)
     assert card_id.startswith(before)
+
+
+def test_animal_prompt_has_face_traits_and_no_clothes(client, openai_server):
+    character = make_character(client, character_type="animal")
+    photocard(client, character)
+    [request] = image_requests(openai_server)
+    for trait in character["parameters"]["face_traits"]:
+        assert trait in request["prompt"]
+    assert "옷이나 장신구를 입히지 않는다" in request["prompt"]
+    assert "화풍" not in request["prompt"]

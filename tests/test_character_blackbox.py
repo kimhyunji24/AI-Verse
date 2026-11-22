@@ -14,14 +14,14 @@
   - 2026-11-22 이름이 든 문장·특징만 빼는 동작 확인으로 변경, 사람이 아닌 캐릭터 지시 확인 추가
   - 2026-11-22 이름·종족 규칙 확인 추가
   - 2026-11-22 이름 낱말(name_hints) 확인으로 변경
+  - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체, 화풍 추출 테스트 삭제
+  - 2026-11-22 동물 종류와 이름 낱말이 무작위인지 확인하도록 변경
 """
 
 import itertools
 import json
 
 import pytest
-
-from tests.conftest import STYLE_FEATURES, STYLE_TEXT
 
 FEATURES = {
     "face_aspect_ratio": 1.3317,
@@ -50,7 +50,7 @@ ANSWERS = {
     "bag": "book",
 }
 ANSWER_OPTIONS = {
-    "character_type": ["nonhuman", "anime"],
+    "character_type": ["nonhuman", "animal"],
     "place": ["deep_sea", "night_sky", "old_library", "neon_city"],
     "companion": ["alone", "one_friend", "crowd"],
     "wish_2027": ["adventure", "rest", "growth", "connection"],
@@ -112,8 +112,15 @@ def test_response_has_every_card_field(client, openai_server):
     assert_valid_stats(data["stats"])
 
 
-def test_same_input_gives_same_rule_result(client, openai_server):
-    assert create(client)["parameters"] == create(client)["parameters"]
+# 무작위로 뽑는 재료. 같은 입력이어도 매번 달라진다.
+RANDOM_FIELDS = ("name_hints",)
+
+
+def test_same_input_gives_same_rule_result_except_random_picks(client, openai_server):
+    first, second = create(client)["parameters"], create(client)["parameters"]
+    for field in RANDOM_FIELDS:
+        first.pop(field), second.pop(field)
+    assert first == second
 
 
 @pytest.mark.parametrize(
@@ -197,9 +204,9 @@ def test_answers_change_the_result(client, openai_server, question, field):
 
 def test_character_type_changes_candidates_and_is_sent_to_ai(client, openai_server):
     nonhuman = create(client, answers={"character_type": "nonhuman"})["parameters"]
-    anime = create(client, answers={"character_type": "anime"})["parameters"]
-    assert set(nonhuman["race_candidates"]).isdisjoint(anime["race_candidates"])
-    assert "애니메이션" in openai_server.requests[1]["input"]
+    animal = create(client, answers={"character_type": "animal"})["parameters"]
+    assert set(nonhuman["race_candidates"]).isdisjoint(animal["race_candidates"])
+    assert "실제 동물" in openai_server.requests[1]["input"]
     assert "머리가 사물인" in openai_server.requests[0]["input"]
     assert all("머리" in race for race in nonhuman["race_candidates"])
 
@@ -267,8 +274,8 @@ def test_instructions_explain_both_character_types(client, openai_server):
     instructions = openai_server.requests[0]["instructions"]
     assert "머리가 사물인 인외 캐릭터:" in instructions
     assert "촉수나 괴물로 만들지 않고" in instructions
-    assert "애니메이션 캐릭터:" in instructions
-    assert "기존 작품의 캐릭터와 구별되는 오리지널" in instructions
+    assert "실제 동물 캐릭터:" in instructions
+    assert "옷이나 장신구를 입히지 않고" in instructions
 
 
 def test_instructions_forbid_judging_the_participant(client, openai_server):
@@ -355,106 +362,23 @@ def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
 
 
-# 애니메이션 캐릭터: 화풍과 얼굴 생김새
-
-
-def test_anime_gets_art_style_and_face_traits_nonhuman_does_not(client, openai_server):
-    anime = create(client, answers={"character_type": "anime"})["parameters"]
-    nonhuman = create(client, answers={"character_type": "nonhuman"})["parameters"]
-    assert anime["art_style"]
-    assert len(anime["face_traits"]) >= 3
-    assert nonhuman["art_style"] == "" and nonhuman["face_traits"] == []
-
-
-def test_answers_change_art_reference(client, openai_server):
-    for power in ANSWER_OPTIONS["power"]:
-        create(client, answers={"character_type": "anime", "power": power})
-    references = {json.loads(request["input"])["reference"] for request in openai_server.style_requests}
-    # 얼굴형이 같으면 힘마다 다른 참고 캐릭터에서 화풍을 뽑는다
-    assert len(references) == len(ANSWER_OPTIONS["power"])
-
-
-def test_art_style_is_extracted_for_anime_only(client, openai_server):
-    create(client, answers={"character_type": "nonhuman"})
-    assert openai_server.style_requests == []
-    anime = create(client, answers={"character_type": "anime"})
-    [style_request] = openai_server.style_requests
-    assert anime["parameters"]["art_style"] == STYLE_TEXT
-    assert anime["parameters"]["art_features"] == STYLE_FEATURES
-    # 참가자 얼굴 생김새를 함께 보내 특징에 반영하게 한다
-    sent = json.loads(style_request["input"])
-    assert sent["face_traits"] == anime["parameters"]["face_traits"]
-    # 뽑은 화풍과 특징이 캐릭터 결정 요청에도 들어간다
-    decision_input = openai_server.requests[-1]["input"]
-    assert STYLE_TEXT in decision_input
-    assert all(feature in decision_input for feature in STYLE_FEATURES)
-    # 참고 캐릭터 이름은 추출 요청에만 쓰고 응답에는 나오지 않는다
-    assert sent["reference"] not in json.dumps(anime, ensure_ascii=False)
-
-
-def test_failed_style_extraction_falls_back_to_preset(client, openai_server):
-    openai_server.style_status = 500
-    anime = create(client, answers={"character_type": "anime"})
-    assert anime["parameters"]["art_style"]
-    assert anime["parameters"]["art_style"] != STYLE_TEXT
-    # 특징 없이 얼굴 생김새 문구만으로 만든다
-    assert anime["parameters"]["art_features"] == []
-    assert anime["parameters"]["face_traits"]
-
-
-def test_style_text_with_reference_name_is_discarded(client, openai_server):
-    create(client, answers={"character_type": "anime"})
-    name = json.loads(openai_server.style_requests[0]["input"])["reference"].split()[-1]
-    # 이름이 든 문장·특징만 빼고 나머지는 살린다
-    openai_server.style_text = f"{name}처럼 그린다. 선은 굵고 부드럽다."
-    openai_server.style_features = [f"{name}와 같은 귀", "반짝이는 큰 눈"]
-    anime = create(client, answers={"character_type": "anime"})
-    assert name not in json.dumps(anime, ensure_ascii=False)
-    assert anime["parameters"]["art_style"] == "선은 굵고 부드럽다."
-    assert anime["parameters"]["art_features"] == ["반짝이는 큰 눈"]
-    # 화풍 문장이 모두 빠지면 대체 화풍을 쓴다
-    openai_server.style_text = f"{name}처럼 그린다."
-    anime = create(client, answers={"character_type": "anime"})
-    assert name not in json.dumps(anime, ensure_ascii=False)
-    assert anime["parameters"]["art_style"]
+# 실제 동물 캐릭터: 얼굴 생김새
 
 
 def test_face_shape_changes_face_traits(client, openai_server):
     wide = {**FEATURES, "face_aspect_ratio": 1.15, "mouth_width_ratio": 0.55}
     long = {**FEATURES, "face_aspect_ratio": 1.50, "mouth_width_ratio": 0.30}
-    traits_wide = create(client, features=wide, answers={"character_type": "anime"})["parameters"]["face_traits"]
-    traits_long = create(client, features=long, answers={"character_type": "anime"})["parameters"]["face_traits"]
+    traits_wide = create(client, features=wide, answers={"character_type": "animal"})["parameters"]["face_traits"]
+    traits_long = create(client, features=long, answers={"character_type": "animal"})["parameters"]["face_traits"]
     assert "가로로 넓고 둥근 얼굴형" in traits_wide and "입이 큰 편" in traits_wide
     assert "세로로 갸름한 얼굴형" in traits_long and "입이 작은 편" in traits_long
 
 
 def test_face_traits_never_judge_appearance(client, openai_server):
     for features in ({**FEATURES, name: low} for name, (low, _) in FEATURE_BOUNDS.items()):
-        traits = create(client, features=features, answers={"character_type": "anime"})["parameters"]["face_traits"]
+        traits = create(client, features=features, answers={"character_type": "animal"})["parameters"]["face_traits"]
         for word in ("예쁜", "못생긴", "잘생긴", "매력", "아름다운", "추한"):
             assert all(word not in trait for trait in traits)
-
-
-def test_only_eye_and_ear_features_are_kept(client, openai_server):
-    openai_server.style_features = ["동글동글한 2등신 몸", "반짝이는 큰 눈", "짧은 입", "축 처진 긴 귀"]
-    anime = create(client, answers={"character_type": "anime"})
-    assert anime["parameters"]["art_features"] == ["반짝이는 큰 눈", "축 처진 긴 귀"]
-
-
-def test_common_word_is_not_mistaken_for_a_name(client, openai_server):
-    # 옷 이름 "원피스"는 작품 이름과 겹치지만 일반 낱말이라 추출 결과를 버리지 않는다
-    for power in ANSWER_OPTIONS["power"]:
-        openai_server.style_features = ["원피스 깃처럼 둥근 귀", "반짝이는 큰 눈"]
-        anime = create(client, answers={"character_type": "anime", "power": power})
-        assert anime["parameters"]["art_features"] == ["원피스 깃처럼 둥근 귀", "반짝이는 큰 눈"]
-
-
-def test_anime_character_is_never_a_human(client, openai_server):
-    create(client, answers={"character_type": "anime"})
-    instructions = openai_server.requests[0]["instructions"]
-    assert "사람이 아닌 캐릭터" in instructions
-    assert "사람이나 사람처럼 생긴 인물" in instructions
-    assert "사람이 아닌 캐릭터" in openai_server.style_requests[0]["instructions"]
 
 
 def test_instructions_ask_for_short_cute_names(client, openai_server):
@@ -465,27 +389,34 @@ def test_instructions_ask_for_short_cute_names(client, openai_server):
     assert "12자 이내" in instructions
 
 
-def test_anime_race_candidates_are_short_creature_names(client, openai_server):
-    for place in ANSWER_OPTIONS["place"]:
-        anime = create(client, answers={"character_type": "anime", "place": place})["parameters"]
-        for race in anime["race_candidates"]:
-            assert len(race) <= 12 and " " not in race, race
-
-
-def test_name_hints_are_meaningful_words_that_differ_between_participants(client, openai_server):
-    first = create(client)["parameters"]["name_hints"]
-    again = create(client)["parameters"]["name_hints"]
-    other = create(client, features={**FEATURES, "jaw_width_ratio": 0.9})["parameters"]["name_hints"]
-    assert len(first) == 4 and len(set(first)) == 4
-    assert all(len(word) >= 2 for word in first)
-    assert first == again
-    assert first != other
+def test_name_hints_are_random_meaningful_words(client, openai_server):
+    draws = [tuple(create(client)["parameters"]["name_hints"]) for _ in range(6)]
+    for hints in draws:
+        assert len(hints) == 4 and len(set(hints)) == 4
+        assert all(len(word) >= 2 for word in hints)
+    # 같은 입력이어도 매번 무작위로 달라진다
+    assert len(set(draws)) > 1
     instructions = openai_server.requests[0]["instructions"]
     assert "name_hints" in instructions
     assert "뜻 없는 음절" in instructions
 
 
-def test_name_hints_follow_the_place(client, openai_server):
-    sea = create(client, answers={"place": "deep_sea"})["parameters"]["name_hints"]
-    city = create(client, answers={"place": "neon_city"})["parameters"]["name_hints"]
-    assert set(sea[2:]).isdisjoint(city[2:])
+def test_animal_gets_face_traits_nonhuman_does_not(client, openai_server):
+    animal = create(client, answers={"character_type": "animal"})["parameters"]
+    nonhuman = create(client, answers={"character_type": "nonhuman"})["parameters"]
+    assert len(animal["face_traits"]) >= 3
+    assert nonhuman["face_traits"] == []
+    assert "art_style" not in animal and "art_features" not in animal
+
+
+def test_animal_race_candidates_are_random_real_animals(client, openai_server):
+    draws = [
+        tuple(create(client, answers={"character_type": "animal"})["parameters"]["race_candidates"])
+        for _ in range(6)
+    ]
+    for races in draws:
+        assert len(races) == 3 and len(set(races)) == 3
+        for race in races:
+            assert 1 < len(race) <= 5 and " " not in race and "머리" not in race, race
+    # 응답이나 얼굴로 정하지 않고 매번 무작위로 뽑는다
+    assert len(set(draws)) > 1

@@ -15,6 +15,7 @@
   - 2026-11-22 얼굴 생김새가 반영된 생김새 특징(art_features) 추가
   - 2026-11-22 이름 음절(name_sounds) 추가
   - 2026-11-22 이름 음절을 뜻 있는 이름 낱말(name_hints)로 변경
+  - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터(animal)로 교체, 화풍·특징 필드 삭제
   - 2026-11-22 포토카드 요청에 손 모양(hand_gestures) 추가
 """
 
@@ -47,7 +48,7 @@ class FaceFeatures(BaseModel):
 class Answers(BaseModel):
     """참가자 응답. 프롬프트 주입을 막기 위해 자유 입력 없이 선택지만 받는다."""
 
-    character_type: Literal["nonhuman", "anime"]
+    character_type: Literal["nonhuman", "animal"]
     place: Literal["deep_sea", "night_sky", "old_library", "neon_city"]
     companion: Literal["alone", "one_friend", "crowd"]
     wish_2027: Literal["adventure", "rest", "growth", "connection"]
@@ -100,11 +101,8 @@ class CharacterParameters(BaseModel):
     base_stats: Stats
     # 이름의 바탕이 될 낱말 4개(의태어 2 + 장소별 간식·작은 물건 2). 참가자마다 달라서 이름이 겹치지 않게 한다.
     name_hints: list[str] = []
-    # 애니메이션 캐릭터만: 화풍 특징 글과, 참가자와 닮게 옮길 얼굴 생김새 문구 (인외 캐릭터는 비어 있다)
-    art_style: str = ""
+    # 실제 동물 캐릭터만: 참가자와 닮게 옮길 얼굴 생김새 문구 (인외 캐릭터는 비어 있다)
     face_traits: list[str] = []
-    # 애니메이션 캐릭터만: 참고 캐릭터의 생김새 특징에 face_traits를 반영한 문장 (추출 실패 시 비어 있다)
-    art_features: list[str] = []
 
 
 class AiDecision(BaseModel):
