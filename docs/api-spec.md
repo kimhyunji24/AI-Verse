@@ -130,7 +130,7 @@ front(`feat/front`)와 back(`feat/back`) 사이의 데이터 형식입니다. �
 
 | 단계 | 담당 | 결과 |
 | --- | --- | --- |
-| 일러스트 | GPT Image (`app/services/illustration.py`) | 1024×1536 세로 PNG. 캐릭터 글(외형, 종족, 속성, 색감, 배경)만 프롬프트로 씁니다 |
+| 일러스트 | GPT Image (`app/services/illustration.py`) | 1024×1024 정사각 PNG. 카드의 정보 패널 위 영역에만 배치되어 캐릭터가 패널에 가려지지 않습니다. 캐릭터 글(외형, 종족, 속성, 색감, 배경)만 프롬프트로 씁니다 |
 | 합성 | Pillow (`app/services/photocard.py`) | 100×148mm(300dpi, 1181×1748) 풀아트 홀로그램 카드 PNG |
 
 - 참가자 얼굴 이미지와 측정값은 이미지 생성 요청에 넣지 않습니다.
