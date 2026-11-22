@@ -18,6 +18,7 @@
  *   - 2026-11-03 펑 터질 때 "나야, 부캐" 문구 표시
  *   - 2026-11-22 캐릭터 생성 뒤 포토카드(일러스트 + 합성) 요청, 완성 전에는 카드 완성 버튼을 막음
  *   - 2026-11-22 얼굴 측정 뒤 포즈 잡기 단계 추가, 뼈대 그림을 포토카드 요청에 함께 보냄
+ *   - 2026-11-22 포즈 단계에서 손가락과 손 모양을 잡아 뼈대 그림과 포토카드 요청에 반영, 인식한 손 모양 표시
  */
 
 "use client";
@@ -55,6 +56,10 @@ import {
   type Ingredient,
 } from "@/lib/ingredients";
 import {
+  GESTURE_LABELS,
+  type Hand,
+  type HandGesture,
+  handGestures,
   isUsablePose,
   type PoseLandmark,
   renderSkeletonPng,
@@ -107,7 +112,9 @@ export default function ObservatoryFlow() {
   const { start: startWebcam } = webcam;
   const overlayRef = useRef<OverlayHandle>(null);
   const poseOverlayRef = useRef<PoseOverlayHandle>(null);
-  const latestPoseRef = useRef<{ pose: PoseLandmark[]; aspect: number } | null>(null);
+  const latestPoseRef = useRef<{ pose: PoseLandmark[]; hands: Hand[]; aspect: number } | null>(
+    null,
+  );
   const samplesRef = useRef<FaceFeatures[]>([]);
   const scanStartRef = useRef(0);
   const holdFrameRef = useRef(0);
@@ -131,6 +138,9 @@ export default function ObservatoryFlow() {
   const [cardFailure, setCardFailure] = useState<CharacterApiError | null>(null);
   // 찍은 포즈 뼈대 그림. 화면에 그리지 않고 포토카드 요청에만 쓴다.
   const poseSkeletonRef = useRef<string | null>(null);
+  const handGesturesRef = useRef<HandGesture[]>([]);
+  // 포즈 단계 화면에 보여줄 인식한 손 모양 (바뀔 때만 다시 그린다)
+  const [gestureText, setGestureText] = useState("");
   // 다음 참가자로 넘어간 뒤 늦게 도착한 이전 참가자의 포토카드를 버리기 위한 번호
   const cardRequestRef = useRef(0);
 
@@ -174,11 +184,16 @@ export default function ObservatoryFlow() {
   const landmarkerStatus = useFaceLandmarker(webcam.videoRef, handleFrame);
 
   const handlePose = useCallback(
-    (pose: PoseLandmark[] | undefined, video: HTMLVideoElement) => {
-      poseOverlayRef.current?.draw(pose, video);
+    (pose: PoseLandmark[] | undefined, hands: Hand[], video: HTMLVideoElement) => {
+      poseOverlayRef.current?.draw(pose, hands, video);
       if (isUsablePose(pose)) {
-        latestPoseRef.current = { pose, aspect: video.videoWidth / video.videoHeight };
+        latestPoseRef.current = { pose, hands, aspect: video.videoWidth / video.videoHeight };
       }
+      const text = handGestures(hands)
+        .sort((a, b) => a.side.localeCompare(b.side))
+        .map(({ side, gesture }) => `${side === "left" ? "왼손" : "오른손"} ${GESTURE_LABELS[gesture]}`)
+        .join(" · ");
+      setGestureText((current) => (current === text ? current : text));
     },
     [],
   );
@@ -186,8 +201,9 @@ export default function ObservatoryFlow() {
 
   // 포즈를 찍은 뒤(또는 포즈 없이) 설문으로 넘어간다
   const finishPose = useCallback(
-    (skeleton: string | null) => {
+    (skeleton: string | null, gestures: HandGesture[] = []) => {
       poseSkeletonRef.current = skeleton;
+      handGesturesRef.current = gestures;
       setStep("survey");
       if (!features) return;
       // 측정값이 재료로 변해 하나씩 항아리에 빠진다
@@ -212,7 +228,11 @@ export default function ObservatoryFlow() {
     setDrawing(true);
     setCardFailure(null);
     try {
-      const card = await createPhotocard(created, poseSkeletonRef.current);
+      const card = await createPhotocard(
+        created,
+        poseSkeletonRef.current,
+        handGesturesRef.current,
+      );
       if (request === cardRequestRef.current) setPhotocard(card);
     } catch (error) {
       if (request !== cardRequestRef.current) return;
@@ -263,6 +283,8 @@ export default function ObservatoryFlow() {
     setFailure(null);
     latestPoseRef.current = null;
     poseSkeletonRef.current = null;
+    handGesturesRef.current = [];
+    setGestureText("");
     cardRequestRef.current += 1;
     setPhotocard(null);
     setDrawing(false);
@@ -336,7 +358,10 @@ export default function ObservatoryFlow() {
       }
       const captured = latestPoseRef.current;
       if (captured) {
-        finishPose(renderSkeletonPng(captured.pose, captured.aspect));
+        finishPose(
+          renderSkeletonPng(captured.pose, captured.aspect, captured.hands),
+          handGestures(captured.hands),
+        );
       } else if (poseAttempt + 1 < POSE_ATTEMPTS) {
         setPoseAttempt(poseAttempt + 1);
         setPoseCount(POSE_SECONDS);
@@ -423,6 +448,9 @@ export default function ObservatoryFlow() {
               ? "어깨와 팔이 화면에 보이게 조금 뒤로 앉아 주세요"
               : "손과 팔을 자유롭게 움직여 보세요. 숫자가 끝나면 찰칵!"}
           </p>
+          {gestureText && (
+            <p className="text-sm text-amber-200">인식한 손 모양: {gestureText}</p>
+          )}
         </div>
       )}
 

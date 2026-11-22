@@ -14,9 +14,11 @@
  *   - 2026-11-03 캐릭터 유형 이름을 오브젝트 헤드, 애니메이션 캐릭터로 변경
  *   - 2026-11-22 포토카드 생성 요청(POST /api/photocard) 추가
  *   - 2026-11-22 포토카드 요청에 포즈 뼈대 그림 추가
+ *   - 2026-11-22 포토카드 요청에 손 모양 추가
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
+import type { HandGesture } from "@/lib/poseSkeleton";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -186,14 +188,16 @@ export function createCharacter(
 /**
  * 일러스트를 그리고 포토카드를 합성한다. 이미지 생성이라 수십 초 걸릴 수 있다.
  * poseSkeleton: 얼굴 없이 관절만 이은 뼈대 PNG(data URL). 없으면 자유 자세로 그린다.
+ * handGestures: 화면 기준 왼쪽·오른쪽 손의 손 모양 코드 (최대 2개)
  */
 export function createPhotocard(
   character: Character,
   poseSkeleton: string | null,
+  handGestures: HandGesture[],
 ): Promise<Photocard> {
   return post(
     "/api/photocard",
-    { character, pose_skeleton: poseSkeleton },
+    { character, pose_skeleton: poseSkeleton, hand_gestures: handGestures },
     "포토카드를 만들지 못했어요",
   );
 }
