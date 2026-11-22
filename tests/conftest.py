@@ -11,6 +11,7 @@
   - 2026-11-22 이미지 편집 요청(multipart, 포즈 참고 이미지)도 기록하도록 추가
   - 2026-11-22 화풍 추출 요청에 응답하고, 화풍 추출만 실패시키는 설정 추가
   - 2026-11-22 화풍 추출 응답을 화풍 + 생김새 특징(JSON)으로 변경
+  - 2026-11-22 화풍 추출 단계가 없어져 관련 가짜 응답 삭제
 """
 
 import base64
@@ -65,29 +66,15 @@ STORY = {
 }
 
 
-STYLE_TEXT = "굵고 부드러운 손그림 선과 연한 파스텔 채색, 2등신의 동글동글한 비율로 그린다."
-STYLE_FEATURES = ["서로 멀찍이 떨어진 작은 점 같은 눈", "머리 위에 둥글게 솟은 작은 귀"]
-STYLE_MARKER = "애니메이션 아트 디렉터"
-
-
-def is_style_request(request) -> bool:
-    return STYLE_MARKER in request.get("instructions", "")
-
-
 class FakeOpenAI:
     """받은 요청을 기록하고, 정해 둔 내용으로 응답하는 가짜 OpenAI 서버"""
 
     def __init__(self):
         self.requests = []
-        self.style_requests = []
         self.choose = self.first_candidates
         self.status = 200
         self.response_status = "completed"
         self.refuse = False
-        # 화풍 추출 요청만 따로 바꾼다: 실패 상태 코드 또는 돌려줄 글
-        self.style_status = 200
-        self.style_text = STYLE_TEXT
-        self.style_features = list(STYLE_FEATURES)
 
     @staticmethod
     def first_candidates(parameters):
@@ -99,36 +86,7 @@ class FakeOpenAI:
             **STORY,
         }
 
-    def text_body(self, request, text):
-        return {
-            "id": "resp_style",
-            "object": "response",
-            "created_at": 0,
-            "model": request["model"],
-            "status": "completed",
-            "output": [
-                {
-                    "type": "message",
-                    "id": "msg_style",
-                    "status": "completed",
-                    "role": "assistant",
-                    "content": [{"type": "output_text", "text": text, "annotations": []}],
-                }
-            ],
-            "parallel_tool_calls": True,
-            "tool_choice": "auto",
-            "tools": [],
-        }
-
     def body(self, request):
-        if is_style_request(request):
-            return self.text_body(
-                request,
-                json.dumps(
-                    {"art_style": self.style_text, "features": self.style_features},
-                    ensure_ascii=False,
-                ),
-            )
         content = (
             {"type": "refusal", "refusal": "거절"}
             if self.refuse
@@ -171,10 +129,8 @@ def openai_server(monkeypatch):
             else:
                 request = json.loads(raw)
             request["_path"] = self.path
-            # 화풍 추출 요청은 따로 모아 두어, 기존 테스트의 requests 순서가 바뀌지 않게 한다
-            style = is_style_request(request)
-            (fake.style_requests if style else fake.requests).append(request)
-            status = fake.style_status if style else fake.status
+            fake.requests.append(request)
+            status = fake.status
             if status != 200:
                 payload = {"error": {"message": "fake error", "type": "fake"}}
             elif "/images/" in self.path:

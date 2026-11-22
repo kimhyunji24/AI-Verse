@@ -16,6 +16,7 @@
   - 2026-11-22 이미지 생성 오류를 서버 로그에 남기도록 추가
   - 2026-11-22 손 모양(hand_gestures)을 글로 바꿔 프롬프트에 추가, 뼈대 설명에 손가락 추가
   - 2026-11-22 카드가 그림을 패널 위에만 배치하도록 바뀌어 정사각 구도로 변경, 손과 몸이 화면 안에 들어오도록 지시
+  - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체 (사실적인 털과 질감, 옷 없음, 얼굴 생김새 반영)
 """
 
 import base64
@@ -38,10 +39,9 @@ STYLES = {
         "머리 자리에 사물이 달려 있고 목 아래는 사람의 몸인 캐릭터. "
         "사물에 사람 얼굴(눈, 코, 입)을 그려 넣지 않는다. 귀엽고 세련된 판타지 일러스트."
     ),
-    # 애니메이션은 룰이 고른 화풍(parameters.art_style)을 붙여 쓴다
-    "anime": (
-        "사람이 아닌 귀여운 캐릭터(작은 동물, 생물, 마스코트) 일러스트. "
-        "사람이나 사람 모습의 인물로 그리지 않는다."
+    "animal": (
+        "실제 동물 한 마리를 사진처럼 사실적으로 그린 일러스트. 만화 캐릭터가 아니라 실제 동물의 생김새, "
+        "털과 질감, 비율을 그대로 그린다. 옷이나 장신구를 입히지 않는다. 얕은 피사계 심도."
     ),
 }
 
@@ -93,35 +93,24 @@ def build_prompt(
     # parameters.character_type 에는 키(nonhuman)가 아니라 설명 문구가 들어 있다
     type_key = next(
         (key for key, label in CHARACTER_TYPES.items() if label == parameters.character_type),
-        "anime",
+        "animal",
     )
     style = STYLES[type_key]
-    anime_lines = []
-    if type_key == "anime":
-        style += f" 화풍: {parameters.art_style}."
-        anime_lines = [
-            "이 화풍의 특징은 참고만 하고, 기존 작품의 캐릭터와 구별되는 오리지널 캐릭터로 그린다.",
-            *(
-                [f"생김새 특징: {' / '.join(parameters.art_features)}."]
-                if parameters.art_features
-                else []
-            ),
-            *(
-                [f"얼굴 생김새: {', '.join(parameters.face_traits)}. 이 생김새를 캐릭터 얼굴에 반영한다."]
-                if parameters.face_traits
-                else []
-            ),
-        ]
+    face_lines = (
+        [f"얼굴 생김새: {', '.join(parameters.face_traits)}. 이 생김새를 동물의 얼굴에 자연스럽게 반영한다."]
+        if type_key == "animal" and parameters.face_traits
+        else []
+    )
     return "\n".join(
         [
             "홀로그램 트레이딩 카드에 들어갈 캐릭터 일러스트 한 장을 정사각 구도로 그려라.",
             f"스타일: {style}",
-            *anime_lines,
+            *face_lines,
             f"캐릭터: {character.race}, 속성은 {character.element}.",
             f"외형: {character.appearance}",
             f"색감: {character.palette}",
             f"배경: {parameters.realm}을 은은하게 표현한다.",
-            "구도: 캐릭터 한 명이 화면 가운데에 크게 선다. 머리 위로 화면의 약 15%를 비워 두고(제목 자리), "
+            "구도: 캐릭터 한 명이 화면 가운데에 크게 있다. 머리 위로 화면의 약 15%를 비워 두고(제목 자리), "
             "머리, 양손, 몸이 모두 화면 안에 들어오게 그려 어느 부분도 화면 밖으로 잘리지 않게 한다.",
             *([f"자세: {POSE_INSTRUCTIONS}"] if with_pose else []),
             *([gesture_line(hand_gestures)] if hand_gestures else []),
