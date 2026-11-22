@@ -95,7 +95,7 @@ def test_prompt_uses_character_text_only(client, openai_server):
 
 @pytest.mark.parametrize(
     "character_type, expected",
-    [("nonhuman", "머리 자리에 사물"), ("animal", "머리는 실제 동물의 머리이고 목 아래는 사람의 몸")],
+    [("nonhuman", "머리 자리에 사물"), ("animal", "2-head-tall round mochi-like body")],
 )
 def test_prompt_follows_character_type(client, openai_server, character_type, expected):
     photocard(client, make_character(client, character_type=character_type))
@@ -205,17 +205,36 @@ def test_card_id_starts_with_creation_time(client, openai_server):
     assert card_id.startswith(before)
 
 
-def test_animal_prompt_is_a_suited_up_studio_portrait(client, openai_server):
+def test_animal_prompt_is_fixed_cute_style_with_max_emotion(client, openai_server):
+    from app.services.parameters import EMOTIONS
+
     character = make_character(client, character_type="animal")
     photocard(client, character)
     [request] = image_requests(openai_server)
     prompt = request["prompt"]
-    for trait in character["parameters"]["face_traits"]:
+    parameters = character["parameters"]
+    for trait in parameters["face_traits"]:
         assert trait in prompt
-    assert f"옷: {character['parameters']['outfit']}" in prompt
-    assert "90년대 사진관" in prompt and "무지개빛 레이저" in prompt
-    # 배경은 설문 장소가 아니라 우주·레이저로 고정
-    assert character["parameters"]["realm"] not in prompt
+    assert parameters["outfit"] in prompt
+    assert "#3B2820" in prompt and "omit the nose" in prompt
+    # 무작위로 고른 감정의 그림용 문장이 들어간다
+    assert dict(EMOTIONS)[parameters["emotion"]] in prompt
+    assert "MAXIMUM EMOTION" in prompt
+    # 사진관 스타일과 레이저 배경은 동물 캐릭터에 쓰지 않는다
+    assert "90년대 사진관" not in prompt and "레이저" not in prompt
+
+
+def test_animal_background_follows_place(client, openai_server):
+    character = make_character(client, character_type="animal", place="deep_sea")
+    photocard(client, character)
+    [request] = image_requests(openai_server)
+    assert "underwater" in request["prompt"]
+
+
+def test_nonhuman_keeps_studio_portrait(client, openai_server):
+    photocard(client, make_character(client, character_type="nonhuman"))
+    [request] = image_requests(openai_server)
+    assert "90년대 사진관" in request["prompt"] and "무지개빛 레이저" in request["prompt"]
 
 
 def test_transparent_illustration_is_not_turned_black(client, openai_server, monkeypatch):

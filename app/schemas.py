@@ -18,6 +18,7 @@
   - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터(animal)로 교체, 화풍·특징 필드 삭제
   - 2026-11-22 의상(outfit) 추가
   - 2026-11-22 포토카드 요청에 손 모양(hand_gestures) 추가
+  - 2026-11-22 동물 캐릭터의 감정(emotion) 추가
 """
 
 from typing import Literal
@@ -106,6 +107,8 @@ class CharacterParameters(BaseModel):
     outfit: str = ""
     # 실제 동물 캐릭터만: 참가자와 닮게 옮길 얼굴 생김새 문구 (인외 캐릭터는 비어 있다)
     face_traits: list[str] = []
+    # 동물 캐릭터만: 무작위로 고른 격한 감정 (예: 감격해서 눈물 글썽). 인외 캐릭터는 비어 있다.
+    emotion: str = ""
 
 
 class AiDecision(BaseModel):
