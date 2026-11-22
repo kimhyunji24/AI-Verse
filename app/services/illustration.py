@@ -15,6 +15,7 @@
   - 2026-11-22 애니메이션 캐릭터를 사람이 아닌 캐릭터로만 그리도록 변경
   - 2026-11-22 이미지 생성 오류를 서버 로그에 남기도록 추가
   - 2026-11-22 손 모양(hand_gestures)을 글로 바꿔 프롬프트에 추가, 뼈대 설명에 손가락 추가
+  - 2026-11-22 카드가 그림을 패널 위에만 배치하도록 바뀌어 정사각 구도로 변경, 손과 몸이 화면 안에 들어오도록 지시
 """
 
 import base64
@@ -29,8 +30,8 @@ from app.services.parameters import CHARACTER_TYPES
 # 부스 대기 시간이 중요해서 빠른 모델과 중간 품질을 기본값으로 쓴다
 DEFAULT_MODEL = "gpt-image-2.5-flare"
 DEFAULT_QUALITY = "medium"
-# 카드 전체를 채우는 세로 구도 (카드 100×148mm와 비슷한 2:3)
-SIZE = "1024x1536"
+# 카드의 정보 패널 위 영역(1181×1152)이 거의 정사각이라 정사각으로 그린다
+SIZE = "1024x1024"
 
 STYLES = {
     "nonhuman": (
@@ -113,15 +114,15 @@ def build_prompt(
         ]
     return "\n".join(
         [
-            "풀아트 홀로그램 트레이딩 카드의 전면 일러스트 한 장을 세로 구도로 그려라.",
+            "홀로그램 트레이딩 카드에 들어갈 캐릭터 일러스트 한 장을 정사각 구도로 그려라.",
             f"스타일: {style}",
             *anime_lines,
             f"캐릭터: {character.race}, 속성은 {character.element}.",
             f"외형: {character.appearance}",
             f"색감: {character.palette}",
             f"배경: {parameters.realm}을 은은하게 표현한다.",
-            "구도: 캐릭터 한 명이 화면 가운데에서 역동적인 자세로 선다. 머리는 위에서 20% 아래에 오게 하고, "
-            "화면 아래 3분의 1은 캐릭터의 다리와 배경으로 채운다(나중에 글자 패널이 덮는다).",
+            "구도: 캐릭터 한 명이 화면 가운데에 크게 선다. 머리 위로 화면의 약 15%를 비워 두고(제목 자리), "
+            "머리, 양손, 몸이 모두 화면 안에 들어오게 그려 어느 부분도 화면 밖으로 잘리지 않게 한다.",
             *([f"자세: {POSE_INSTRUCTIONS}"] if with_pose else []),
             *([gesture_line(hand_gestures)] if hand_gestures else []),
             "연출: 화려한 빛, 반짝이는 입자, 배경과 어우러지는 극적인 조명.",
