@@ -16,7 +16,11 @@
   - 2026-11-22 애니메이션 캐릭터에 화풍(유명 만화 화풍에서 뽑은 특징 텍스트)과 얼굴 생김새 문구 추가
   - 2026-11-22 참고 캐릭터 목록 추가: 화풍은 참가자마다 GPT가 참고 캐릭터에서 뽑고, 아래 화풍 글은 실패 시 대체용으로 사용
   - 2026-11-22 인외 콘셉트에 맞춰 참고 캐릭터와 대체 화풍을 사람이 아닌 캐릭터(동물·생물·마스코트)로만 구성
+  - 2026-11-22 애니메이션 캐릭터 후보를 사람 직업에서 생물 종류로 교체
+  - 2026-11-22 이름이 겹치지 않도록 참가자마다 다른 이름 음절(name_sounds) 추가
 """
+
+import zlib
 
 from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
 
@@ -116,6 +120,15 @@ ART_STYLE_TABLE = {
     "transform": (5, 0, 1),
 }
 
+# 이름 음절: 얼굴 측정값과 응답으로 3개를 골라 이름에 쓰게 한다.
+# 참가자마다 다른 음절에서 출발해 같은 이름이 반복되지 않고, 같은 입력이면 늘 같은 음절이 나온다.
+NAME_SOUNDS = (
+    "몽", "포", "루", "쿠", "미", "토", "리", "코", "모", "나", "니", "노", "보", "비",
+    "소", "치", "키", "파", "푸", "호", "라", "로", "무", "부", "두", "도", "디", "피",
+    "유", "요", "마", "다", "랑", "롱", "동", "콩", "링", "솜", "봄", "별",
+)
+NAME_SOUND_COUNT = 3
+
 # 애니메이션 캐릭터 얼굴에 옮길 생김새: 점수가 0.5에서 이만큼 벗어나면 (낮을 때, 높을 때) 문구를 쓴다.
 # 좋고 나쁨이 없는 생김새 묘사만 쓴다.
 FACE_TRAIT_THRESHOLD = 0.15
@@ -141,12 +154,13 @@ NONHUMAN_RACES = {
     "neon_city": (("자판기 머리", "게임기 머리"), ("브라운관 TV 머리", "헤드폰 머리"), ("네온사인 머리", "신호등 머리")),
 }
 
-# 애니 캐릭터의 역할 후보: 응답(장소) × 실루엣 단계별 2개
+# 애니메이션 캐릭터(사람이 아닌 생물)의 종류 후보: 응답(장소) × 실루엣 단계별 2개
+# 실루엣: 넓게 퍼지는(동글·통통) / 균형 / 길게 뻗는(늘씬·긴 꼬리)
 ANIME_ROLES = {
-    "deep_sea": (("심해 등대지기", "잠수 탐험가"), ("바다 마법사", "인양 기사"), ("해류 항해사", "심해 음유시인")),
-    "night_sky": (("별자리 학자", "천문대 견습생"), ("달빛 궁수", "별똥별 배달부"), ("유성 검사", "밤하늘 지도 제작자")),
-    "old_library": (("금서 사서", "마법 필경사"), ("룬 문자 해독가", "마법학교 우등생"), ("고서 수호 기사", "두루마리 소환사")),
-    "neon_city": (("뒷골목 해커", "네온 정비사"), ("홀로그램 아이돌", "도시 탐정"), ("네온 바이크 라이더", "전광판 마법사")),
+    "deep_sea": (("방울해파리", "조약돌게"), ("물결수달", "산호해마"), ("꼬리고래", "리본장어")),
+    "night_sky": (("별사탕햄스터", "달토끼"), ("구름고양이", "별똥다람쥐"), ("은하여우", "밤하늘부엉이")),
+    "old_library": (("책벌레쥐", "잉크고슴도치"), ("책갈피펭귄", "촛불너구리"), ("두루마리족제비", "고서올빼미")),
+    "neon_city": (("픽셀병아리", "네온개구리"), ("배터리강아지", "전구오리"), ("홀로그램고양이", "네온라쿤")),
 }
 RACE_TABLES = {"nonhuman": NONHUMAN_RACES, "anime": ANIME_ROLES}
 
@@ -315,6 +329,17 @@ def _face_traits(scores: dict[str, float]) -> list[str]:
     return [FACE_TRAITS[name][scores[name] >= 0.5] for name in picked]
 
 
+def _name_sounds(features: FaceFeatures, answers: Answers) -> list[str]:
+    seed = zlib.crc32((features.model_dump_json() + answers.model_dump_json()).encode())
+    sounds = []
+    while len(sounds) < NAME_SOUND_COUNT:
+        sound = NAME_SOUNDS[seed % len(NAME_SOUNDS)]
+        if sound not in sounds:
+            sounds.append(sound)
+        seed = seed // len(NAME_SOUNDS) + 7919 * (len(sounds) + 1)
+    return sounds
+
+
 def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParameters:
     silhouette = _tier(features, "face_aspect_ratio")
     gaze = _tier(features, "eye_spacing_ratio")
@@ -354,6 +379,7 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
             DISPOSITIONS[answers.companion][near_gaze],
         ],
         base_stats=_base_stats(features, answers, scores),
+        name_sounds=_name_sounds(features, answers),
         art_style=ART_STYLES[ART_STYLE_TABLE[answers.power][silhouette]] if anime else "",
         face_traits=_face_traits(scores) if anime else [],
     )

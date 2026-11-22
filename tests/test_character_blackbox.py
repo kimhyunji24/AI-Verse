@@ -12,6 +12,7 @@
   - 2026-11-22 참고 캐릭터에서 화풍을 뽑는 단계 확인 추가 (대체 화풍, 이름 노출 방지)
   - 2026-11-22 생김새 특징 추출과 얼굴 생김새 반영 확인 추가 (눈·귀 특징만)
   - 2026-11-22 이름이 든 문장·특징만 빼는 동작 확인으로 변경, 사람이 아닌 캐릭터 지시 확인 추가
+  - 2026-11-22 이름·종족 규칙 확인 추가
 """
 
 import itertools
@@ -453,3 +454,28 @@ def test_anime_character_is_never_a_human(client, openai_server):
     assert "사람이 아닌 캐릭터" in instructions
     assert "사람이나 사람처럼 생긴 인물" in instructions
     assert "사람이 아닌 캐릭터" in openai_server.style_requests[0]["instructions"]
+
+
+def test_instructions_ask_for_short_cute_names(client, openai_server):
+    create(client)
+    instructions = openai_server.requests[0]["instructions"]
+    assert "2~4글자" in instructions
+    assert "그대로 이어 붙여 짓지 않는다" in instructions
+    assert "12자 이내" in instructions
+
+
+def test_anime_race_candidates_are_short_creature_names(client, openai_server):
+    for place in ANSWER_OPTIONS["place"]:
+        anime = create(client, answers={"character_type": "anime", "place": place})["parameters"]
+        for race in anime["race_candidates"]:
+            assert len(race) <= 12 and " " not in race, race
+
+
+def test_name_sounds_differ_between_participants_and_reach_ai(client, openai_server):
+    first = create(client)["parameters"]["name_sounds"]
+    again = create(client)["parameters"]["name_sounds"]
+    other = create(client, features={**FEATURES, "jaw_width_ratio": 0.9})["parameters"]["name_sounds"]
+    assert len(first) == 3 and len(set(first)) == 3
+    assert first == again
+    assert first != other
+    assert "name_sounds" in openai_server.requests[0]["instructions"]
