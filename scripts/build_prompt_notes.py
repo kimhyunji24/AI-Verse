@@ -9,6 +9,7 @@
 
 수정 이력:
   - 2026-11-22 최초 작성
+  - 2026-11-22 파일을 직접 열 때 한글이 깨지는 문제 수정 (UTF-8 인코딩 선언 추가)
 """
 
 import argparse
@@ -147,7 +148,9 @@ role_rows = rows(
 )
 style_text = " / ".join(f"<b>{e(k)}</b>: {e(v)}" for k, v in illustration.STYLES.items())
 
-page = f"""<title>이게 나라고? 프롬프트 노트</title>
+# 파일을 브라우저에서 바로 열어도 한글이 깨지지 않도록 인코딩을 맨 앞에 선언한다
+page = f"""<meta charset="utf-8">
+<title>이게 나라고? 프롬프트 노트</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
