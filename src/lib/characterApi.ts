@@ -15,6 +15,7 @@
  *   - 2026-11-22 포토카드 생성 요청(POST /api/photocard) 추가
  *   - 2026-11-22 포토카드 요청에 포즈 뼈대 그림 추가
  *   - 2026-11-22 포토카드 요청에 손 모양 추가
+ *   - 2026-11-22 캐릭터 유형 '애니메이션 캐릭터'를 '실제 동물'로 교체 (값 anime → animal)
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -28,7 +29,7 @@ export const QUESTIONS = [
     title: "어떤 모습으로 태어나게 할까요?",
     options: [
       { value: "nonhuman", label: "오브젝트 헤드" },
-      { value: "anime", label: "애니메이션 캐릭터" },
+      { value: "animal", label: "실제 동물" },
     ],
   },
   {
