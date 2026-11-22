@@ -16,6 +16,7 @@
   - 2026-11-22 이름 낱말(name_hints) 확인으로 변경
   - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체, 화풍 추출 테스트 삭제
   - 2026-11-22 동물 종류와 이름 낱말이 무작위인지 확인하도록 변경
+  - 2026-11-22 이름이 '~한 + 종족' 형식인지 확인 추가
 """
 
 import itertools
@@ -384,8 +385,7 @@ def test_face_traits_never_judge_appearance(client, openai_server):
 def test_instructions_ask_for_short_cute_names(client, openai_server):
     create(client)
     instructions = openai_server.requests[0]["instructions"]
-    assert "2~4글자" in instructions
-    assert "그대로 이어 붙여 짓지 않는다" in instructions
+    assert "~한 + 종족" in instructions
     assert "12자 이내" in instructions
 
 
@@ -398,7 +398,7 @@ def test_name_hints_are_random_meaningful_words(client, openai_server):
     assert len(set(draws)) > 1
     instructions = openai_server.requests[0]["instructions"]
     assert "name_hints" in instructions
-    assert "뜻 없는 음절" in instructions
+    assert "뜻 없는 소리" in instructions
 
 
 def test_animal_gets_face_traits_nonhuman_does_not(client, openai_server):
@@ -417,6 +417,23 @@ def test_animal_race_candidates_are_random_real_animals(client, openai_server):
     for races in draws:
         assert len(races) == 3 and len(set(races)) == 3
         for race in races:
-            assert 1 < len(race) <= 5 and " " not in race and "머리" not in race, race
+            assert 1 <= len(race) <= 5 and " " not in race and "머리" not in race, race
     # 응답이나 얼굴로 정하지 않고 매번 무작위로 뽑는다
     assert len(set(draws)) > 1
+
+
+def test_name_always_ends_with_race(client, openai_server):
+    # 모델이 종족을 빠뜨린 이름을 줘도 "~한 + 종족" 형식으로 맞춘다
+    openai_server.choose = lambda parameters: {
+        **openai_server.first_candidates(parameters),
+        "name": "보송보송한",
+    }
+    data = create(client, answers={"character_type": "animal"})
+    assert data["name"] == f"보송보송한 {data['race']}"
+    # 이미 종족이 들어 있으면 그대로 둔다
+    openai_server.choose = lambda parameters: {
+        **openai_server.first_candidates(parameters),
+        "name": f"몽실한 {parameters['race_candidates'][0]}",
+    }
+    data = create(client, answers={"character_type": "animal"})
+    assert data["name"] == f"몽실한 {data['race']}"

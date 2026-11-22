@@ -11,6 +11,7 @@
   - 2026-11-22 애니메이션 캐릭터는 참고 캐릭터에서 화풍을 먼저 뽑아 재료에 넣도록 추가
   - 2026-11-22 화풍과 함께 얼굴 생김새가 반영된 생김새 특징도 재료에 넣도록 변경
   - 2026-11-22 실제 동물 캐릭터로 바뀌어 화풍·특징 추출 단계 삭제
+  - 2026-11-22 이름이 '~한 + 종족' 형식이 되도록 종족이 빠진 이름에 종족을 붙임
 """
 
 from fastapi import APIRouter, HTTPException
@@ -32,6 +33,9 @@ def create_character(req: CharacterRequest):
             status_code=503 if error.retryable else 500,
             detail={"message": str(error), "retryable": error.retryable},
         ) from error
+    # 이름은 "~한 + 종족" 형식이다. 모델이 종족을 빠뜨리면 뒤에 붙인다.
+    if decision.race not in decision.name:
+        decision.name = f"{decision.name} {decision.race}"
     return CharacterResponse(
         **decision.model_dump(),
         palette=parameters.palette,
