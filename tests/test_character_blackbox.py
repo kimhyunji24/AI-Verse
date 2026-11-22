@@ -13,6 +13,7 @@
   - 2026-11-22 생김새 특징 추출과 얼굴 생김새 반영 확인 추가 (눈·귀 특징만)
   - 2026-11-22 이름이 든 문장·특징만 빼는 동작 확인으로 변경, 사람이 아닌 캐릭터 지시 확인 추가
   - 2026-11-22 이름·종족 규칙 확인 추가
+  - 2026-11-22 이름 낱말(name_hints) 확인으로 변경
 """
 
 import itertools
@@ -471,11 +472,20 @@ def test_anime_race_candidates_are_short_creature_names(client, openai_server):
             assert len(race) <= 12 and " " not in race, race
 
 
-def test_name_sounds_differ_between_participants_and_reach_ai(client, openai_server):
-    first = create(client)["parameters"]["name_sounds"]
-    again = create(client)["parameters"]["name_sounds"]
-    other = create(client, features={**FEATURES, "jaw_width_ratio": 0.9})["parameters"]["name_sounds"]
-    assert len(first) == 3 and len(set(first)) == 3
+def test_name_hints_are_meaningful_words_that_differ_between_participants(client, openai_server):
+    first = create(client)["parameters"]["name_hints"]
+    again = create(client)["parameters"]["name_hints"]
+    other = create(client, features={**FEATURES, "jaw_width_ratio": 0.9})["parameters"]["name_hints"]
+    assert len(first) == 4 and len(set(first)) == 4
+    assert all(len(word) >= 2 for word in first)
     assert first == again
     assert first != other
-    assert "name_sounds" in openai_server.requests[0]["instructions"]
+    instructions = openai_server.requests[0]["instructions"]
+    assert "name_hints" in instructions
+    assert "뜻 없는 음절" in instructions
+
+
+def test_name_hints_follow_the_place(client, openai_server):
+    sea = create(client, answers={"place": "deep_sea"})["parameters"]["name_hints"]
+    city = create(client, answers={"place": "neon_city"})["parameters"]["name_hints"]
+    assert set(sea[2:]).isdisjoint(city[2:])
