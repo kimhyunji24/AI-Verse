@@ -13,6 +13,7 @@
   - 2026-11-22 카드 ID가 생성 시각 형식인지 확인 추가
   - 2026-11-22 애니메이션 캐릭터를 실제 동물 캐릭터로 교체
   - 2026-11-22 사진관 프로필 스타일(의상, 우주·레이저 배경, 동물 머리 + 사람 몸) 확인으로 변경
+  - 2026-11-22 투명 배경 일러스트가 검게 합성되지 않는지 확인 추가
 """
 
 import base64
@@ -215,3 +216,19 @@ def test_animal_prompt_is_a_suited_up_studio_portrait(client, openai_server):
     assert "90년대 사진관" in prompt and "무지개빛 레이저" in prompt
     # 배경은 설문 장소가 아니라 우주·레이저로 고정
     assert character["parameters"]["realm"] not in prompt
+
+
+def test_transparent_illustration_is_not_turned_black(client, openai_server, monkeypatch):
+    # 가짜 서버가 배경이 투명한 그림(가운데만 색이 있음)을 돌려주게 한다
+    import tests.conftest as conftest
+
+    image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    image.paste((200, 80, 80, 255), (24, 24, 40, 40))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    monkeypatch.setattr(conftest, "FAKE_IMAGE_B64", base64.b64encode(buffer.getvalue()).decode())
+    response = photocard(client, make_character(client))
+    card = Image.open(io.BytesIO(client.get(response.json()["card_url"]).content)).convert("RGB")
+    # 그림 영역 위쪽 모서리 근처(투명했던 곳)가 검정이 아니라 밝은 바탕이어야 한다
+    r, g, b = card.getpixel((300, 300))
+    assert r + g + b > 300, (r, g, b)
