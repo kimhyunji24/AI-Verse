@@ -169,3 +169,9 @@ def test_anime_prompt_has_art_style_and_face_traits(client, openai_server):
     for feature in character["parameters"]["art_features"]:
         assert feature in request["prompt"]
     assert character["parameters"]["art_features"]
+
+
+def test_anime_prompt_forbids_humans(client, openai_server):
+    photocard(client, make_character(client, character_type="anime"))
+    [request] = image_requests(openai_server)
+    assert "사람이나 사람 모습의 인물로 그리지 않는다" in request["prompt"]

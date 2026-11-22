@@ -3,7 +3,7 @@
 
 역할: 참고 캐릭터 이름과 참가자 얼굴 생김새를 GPT에 보내, 그림체(화풍 지시문)와
       참가자 얼굴이 반영된 생김새 특징 목록을 글로 뽑는다.
-비고: 애니메이션 캐릭터를 만들 때마다 호출한다. 이름은 이 요청에만 쓰고, 결과에 이름이 보이면 전부 버린다.
+비고: 애니메이션 캐릭터를 만들 때마다 호출한다. 이름은 이 요청에만 쓰고, 결과에서 이름이 든 문장·특징은 뺀다.
       특징은 눈과 귀 생김새만 뽑고, 각 특징에 참가자 얼굴 생김새(눈 관련)를 반영해 바꾼다.
       눈·귀가 아닌 특징이 섞여 나오면 버린다. 코·입·턱 같은 나머지 생김새는 face_traits로 따로 프롬프트에 들어간다.
       그 캐릭터를 바로 알아보게 하는 고유 의상, 로고·문양, 이름은 뽑지 않는다.
@@ -15,11 +15,14 @@
   - 2026-11-22 생김새 특징 추출 추가, 참가자 얼굴 생김새를 특징에 반영하도록 변경
   - 2026-11-22 생김새 특징을 눈과 귀로만 제한
   - 2026-11-22 이름 확인을 이름 자동 분리 대신 지정한 고유 이름 목록으로 변경 (원피스 같은 일반 낱말 오탐 방지)
+  - 2026-11-22 새 캐릭터를 사람이 아닌 캐릭터로 그린다는 전제 추가
+  - 2026-11-22 이름이 섞이면 전체를 버리는 대신 이름이 든 문장·특징만 빼도록 변경
 """
 
 import json
 import logging
 import os
+import re
 
 import openai
 from pydantic import BaseModel, ValidationError
@@ -30,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 INSTRUCTIONS = """너는 애니메이션 아트 디렉터다. 입력의 reference는 참고할 캐릭터, face_traits는 이번 참가자의 얼굴 생김새다.
 참고 캐릭터를 바탕으로, 참가자를 닮은 새 캐릭터를 그릴 일러스트레이터에게 줄 지시를 만들어라.
+새 캐릭터는 사람이 아닌 캐릭터(작은 동물, 생물, 마스코트)다. 사람이나 인물 묘사는 쓰지 않는다.
 
 art_style: 참고 캐릭터의 그림체를 화풍 지시문으로 쓴다.
 - 선(굵기, 질감), 채색 방식, 등신과 몸 비율, 눈과 얼굴을 표현하는 방식, 색감, 전체 분위기를 3~4문장으로 쓴다.
@@ -83,15 +87,18 @@ def extract_art_reference(
     if response.status != "completed" or result is None or not result.art_style.strip():
         logger.warning("화풍·특징 추출 결과 없음, 대체 화풍 사용")
         return None
-    text = " ".join([result.art_style, *result.features])
-    if any(name in text for name in banned_names):
-        logger.warning("화풍·특징 추출 결과에 이름이 섞여 대체 화풍 사용")
+    def clean(text: str) -> bool:
+        return not any(name in text for name in banned_names)
+
+    # 이름이 든 문장만 빼고 나머지 화풍 설명은 살린다
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+", result.art_style.strip()) if s]
+    style = " ".join(s for s in sentences if clean(s)).strip()
+    features = [
+        feature.strip()
+        for feature in result.features
+        if clean(feature) and any(part in feature for part in FEATURE_PARTS)
+    ][:MAX_FEATURES]
+    if not style:
+        logger.warning("화풍 설명이 남지 않아 대체 화풍 사용")
         return None
-    return ArtReference(
-        art_style=result.art_style.strip()[:MAX_STYLE_LENGTH],
-        features=[
-            feature.strip()
-            for feature in result.features
-            if any(part in feature for part in FEATURE_PARTS)
-        ][:MAX_FEATURES],
-    )
+    return ArtReference(art_style=style[:MAX_STYLE_LENGTH], features=features)

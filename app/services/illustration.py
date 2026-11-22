@@ -12,9 +12,12 @@
   - 2026-11-22 포즈 뼈대 그림을 참고 이미지로 받아 참가자와 같은 자세로 그리도록 추가
   - 2026-11-22 애니메이션 캐릭터는 화풍(art_style)과 얼굴 생김새(face_traits)를 프롬프트에 넣도록 변경
   - 2026-11-22 참가자 얼굴이 반영된 생김새 특징(art_features)을 프롬프트에 추가
+  - 2026-11-22 애니메이션 캐릭터를 사람이 아닌 캐릭터로만 그리도록 변경
+  - 2026-11-22 이미지 생성 오류를 서버 로그에 남기도록 추가
 """
 
 import base64
+import logging
 import os
 
 import openai
@@ -34,8 +37,14 @@ STYLES = {
         "사물에 사람 얼굴(눈, 코, 입)을 그려 넣지 않는다. 귀엽고 세련된 판타지 일러스트."
     ),
     # 애니메이션은 룰이 고른 화풍(parameters.art_style)을 붙여 쓴다
-    "anime": "애니메이션 캐릭터 일러스트.",
+    "anime": (
+        "사람이 아닌 귀여운 캐릭터(작은 동물, 생물, 마스코트) 일러스트. "
+        "사람이나 사람 모습의 인물로 그리지 않는다."
+    ),
 }
+
+
+logger = logging.getLogger(__name__)
 
 
 class IllustrationError(Exception):
@@ -118,20 +127,27 @@ def generate_illustration(character: CharacterResponse, pose_png: bytes | None =
         else:
             # 참고 이미지가 있으면 편집 API로 보낸다. 뼈대는 자세 참고용일 뿐 그대로 남기지 않는다.
             response = client.images.edit(image=("pose.png", pose_png, "image/png"), **options)
-    except openai.AuthenticationError as error:
-        raise IllustrationError("API 키를 확인해 주세요", retryable=False) from error
-    except openai.BadRequestError as error:
-        # 안전 필터에 걸린 경우도 여기로 온다. 다시 그리면 통과할 수 있다.
-        raise IllustrationError("일러스트를 그리지 못했어요. 다시 시도해 주세요", retryable=True) from error
-    except openai.RateLimitError as error:
-        raise IllustrationError("요청이 많아요. 잠시 후 다시 시도해 주세요", retryable=True) from error
-    except (openai.APIConnectionError, openai.InternalServerError) as error:
-        raise IllustrationError("AI 서버에 연결하지 못했어요. 다시 시도해 주세요", retryable=True) from error
-    except openai.APIStatusError as error:
-        raise IllustrationError("일러스트 생성에 실패했어요", retryable=error.status_code >= 500) from error
     except openai.OpenAIError as error:
-        raise IllustrationError("AI 연결 설정을 확인해 주세요", retryable=False) from error
+        # 원인(안전 필터, 모델 이름 등)을 운영자가 볼 수 있게 남긴다. 키 같은 비밀 값은 담기지 않는다.
+        logger.warning("일러스트 생성 실패: %s %s", type(error).__name__, getattr(error, "message", error))
+        raise _friendly_error(error) from error
 
     if not response.data or not response.data[0].b64_json:
         raise IllustrationError("일러스트를 그리지 못했어요. 다시 시도해 주세요", retryable=True)
     return base64.b64decode(response.data[0].b64_json)
+
+
+def _friendly_error(error: openai.OpenAIError) -> IllustrationError:
+    """OpenAI 오류를 참가자·운영자에게 보여줄 문구로 바꾼다."""
+    if isinstance(error, openai.AuthenticationError):
+        return IllustrationError("API 키를 확인해 주세요", retryable=False)
+    if isinstance(error, openai.BadRequestError):
+        # 안전 필터에 걸린 경우도 여기로 온다. 다시 그리면 통과할 수 있다.
+        return IllustrationError("일러스트를 그리지 못했어요. 다시 시도해 주세요", retryable=True)
+    if isinstance(error, openai.RateLimitError):
+        return IllustrationError("요청이 많아요. 잠시 후 다시 시도해 주세요", retryable=True)
+    if isinstance(error, (openai.APIConnectionError, openai.InternalServerError)):
+        return IllustrationError("AI 서버에 연결하지 못했어요. 다시 시도해 주세요", retryable=True)
+    if isinstance(error, openai.APIStatusError):
+        return IllustrationError("일러스트 생성에 실패했어요", retryable=error.status_code >= 500)
+    return IllustrationError("AI 연결 설정을 확인해 주세요", retryable=False)

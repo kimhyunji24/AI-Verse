@@ -11,6 +11,7 @@
   - 2026-11-22 애니메이션 캐릭터의 화풍과 얼굴 생김새 확인 추가
   - 2026-11-22 참고 캐릭터에서 화풍을 뽑는 단계 확인 추가 (대체 화풍, 이름 노출 방지)
   - 2026-11-22 생김새 특징 추출과 얼굴 생김새 반영 확인 추가 (눈·귀 특징만)
+  - 2026-11-22 이름이 든 문장·특징만 빼는 동작 확인으로 변경, 사람이 아닌 캐릭터 지시 확인 추가
 """
 
 import itertools
@@ -402,15 +403,18 @@ def test_failed_style_extraction_falls_back_to_preset(client, openai_server):
 def test_style_text_with_reference_name_is_discarded(client, openai_server):
     create(client, answers={"character_type": "anime"})
     name = json.loads(openai_server.style_requests[0]["input"])["reference"].split()[-1]
-    # 화풍에 섞여도, 특징에만 섞여도 추출 결과 전체를 버린다
+    # 이름이 든 문장·특징만 빼고 나머지는 살린다
+    openai_server.style_text = f"{name}처럼 그린다. 선은 굵고 부드럽다."
+    openai_server.style_features = [f"{name}와 같은 귀", "반짝이는 큰 눈"]
+    anime = create(client, answers={"character_type": "anime"})
+    assert name not in json.dumps(anime, ensure_ascii=False)
+    assert anime["parameters"]["art_style"] == "선은 굵고 부드럽다."
+    assert anime["parameters"]["art_features"] == ["반짝이는 큰 눈"]
+    # 화풍 문장이 모두 빠지면 대체 화풍을 쓴다
     openai_server.style_text = f"{name}처럼 그린다."
     anime = create(client, answers={"character_type": "anime"})
     assert name not in json.dumps(anime, ensure_ascii=False)
-    openai_server.style_text = STYLE_TEXT
-    openai_server.style_features = [f"{name}와 같은 귀"]
-    anime = create(client, answers={"character_type": "anime"})
-    assert name not in json.dumps(anime, ensure_ascii=False)
-    assert anime["parameters"]["art_features"] == []
+    assert anime["parameters"]["art_style"]
 
 
 def test_face_shape_changes_face_traits(client, openai_server):
@@ -441,3 +445,11 @@ def test_common_word_is_not_mistaken_for_a_name(client, openai_server):
         openai_server.style_features = ["원피스 깃처럼 둥근 귀", "반짝이는 큰 눈"]
         anime = create(client, answers={"character_type": "anime", "power": power})
         assert anime["parameters"]["art_features"] == ["원피스 깃처럼 둥근 귀", "반짝이는 큰 눈"]
+
+
+def test_anime_character_is_never_a_human(client, openai_server):
+    create(client, answers={"character_type": "anime"})
+    instructions = openai_server.requests[0]["instructions"]
+    assert "사람이 아닌 캐릭터" in instructions
+    assert "사람이나 사람처럼 생긴 인물" in instructions
+    assert "사람이 아닌 캐릭터" in openai_server.style_requests[0]["instructions"]
