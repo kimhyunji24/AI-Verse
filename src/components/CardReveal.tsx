@@ -4,20 +4,21 @@
  * 카드 등장 연출 (CardReveal)
  *
  * 역할: 완성된 포토카드를 바로 띄우지 않고, 카드 뒷면이 떠오른 뒤 빛 리본이 카드를 감싸며 돌다가
- *       빛이 터지는 순간 카드가 뒤집히며 앞면(완성 카드)이 나오게 한다. 앞면이 정면을 보기까지 약 4.1초.
+ *       카드를 누르면 빛이 터지며 뒤집혀 앞면(완성 카드)이 나온다. 누르기 전까지는 리본이 계속 감아 돈다.
  * 비고: 레퍼런스 영상 구성(나선 빛 리본, 불씨, 빛살 폭발)을 따르고 색만 부스 콘셉트 색
  *       (밤하늘 남보라 + 골드 + 솥의 에메랄드)으로 바꿨다. 빛 효과는 lib/revealFx.ts가 캔버스에 그린다.
- *       움직임 줄이기 설정을 켠 사용자에게는 연출 없이 앞면을 바로 보여준다(globals.css).
+ *       움직임 줄이기 설정을 켠 사용자에게는 빛 없이 누르면 바로 앞면을 보여준다.
  *       카드 뒷면 문양은 코드로 직접 그린 오리지널이다.
  *
  * 수정 이력:
  *   - 2026-11-24 최초 작성
+ *   - 2026-11-24 카드를 눌러야 뒤집히도록 변경 (revealed / onReveal)
  *   - 2026-11-24 레퍼런스 영상처럼 나선 리본·불씨·빛살로 다시 만듦 (캔버스로 그림, 카드는 살짝 흔들리다 뒤집힘)
  */
 
 import { useEffect, useRef, type ReactNode } from "react";
 
-import { runRevealFx } from "@/lib/revealFx";
+import { runRevealFx, type RevealFx } from "@/lib/revealFx";
 
 function CardBack() {
   return (
@@ -50,24 +51,53 @@ function CardBack() {
   );
 }
 
-export default function CardReveal({ children, className = "" }: { children: ReactNode; className?: string }) {
+export default function CardReveal({
+  children,
+  revealed,
+  onReveal,
+  className = "",
+}: {
+  children: ReactNode;
+  /** true가 되는 순간 빛이 터지며 앞면으로 뒤집힌다 */
+  revealed: boolean;
+  /** 뒷면 상태에서 카드를 누르면 부른다 */
+  onReveal: () => void;
+  className?: string;
+}) {
   const stageRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLCanvasElement>(null);
   const frontRef = useRef<HTMLCanvasElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const fxRef = useRef<RevealFx | null>(null);
 
   useEffect(() => {
     const stage = stageRef.current;
-    if (!stage || !backRef.current || !frontRef.current) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    return runRevealFx(backRef.current, frontRef.current, stage.clientWidth, stage.clientHeight);
+    const card = cardRef.current;
+    if (!stage || !card || !backRef.current || !frontRef.current) return;
+    // 움직임 줄이기 설정이면 빛 없이 누를 때 바로 뒤집는다
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      fxRef.current = { reveal: () => (card.style.transform = "rotateY(180deg)"), stop: () => {} };
+      return;
+    }
+    const fx = runRevealFx(backRef.current, frontRef.current, card, stage.clientWidth, stage.clientHeight);
+    fxRef.current = fx;
+    return () => fx.stop();
   }, []);
 
+  useEffect(() => {
+    if (revealed) fxRef.current?.reveal();
+  }, [revealed]);
+
   return (
-    <div ref={stageRef} className={`reveal-stage relative aspect-[100/148] w-[min(92vw,26rem)] ${className}`}>
+    <div
+      ref={stageRef}
+      onClick={revealed ? undefined : onReveal}
+      className={`reveal-stage relative aspect-[100/148] w-[min(92vw,26rem)] ${revealed ? "" : "cursor-pointer"} ${className}`}
+    >
       {/* 카드 뒤 빛(빛살·리본 뒤쪽 반·불씨) */}
       <canvas ref={backRef} className="reveal-fx z-0" aria-hidden="true" />
       <div className="reveal-lift z-10">
-        <div className="reveal-card">
+        <div ref={cardRef} className="reveal-card">
           <CardBack />
           <div className="reveal-face reveal-front">{children}</div>
         </div>

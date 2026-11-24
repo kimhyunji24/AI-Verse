@@ -12,6 +12,7 @@
  *   - 2026-11-03 GPT의 선택 이유(묘약 기록) 표시 추가
  *   - 2026-11-22 완성된 포토카드 이미지 표시와 일러스트 생성 중 문구 추가
  *   - 2026-11-24 그림을 기다리는 동안 카드는 이름·종족·고유 능력·성향만 크게 보여주도록 단순화 (나머지는 완성 카드에)
+ *   - 2026-11-24 카드를 눌러야 앞면이 보이도록 revealed / onReveal 추가
  *   - 2026-11-24 완성 카드가 뒷면 → 빛 리본 → 뒤집기 연출(CardReveal)로 나오도록 변경
  */
 
@@ -27,18 +28,22 @@ export default function CharacterResult({
   photocard,
   drawing,
   printing,
+  revealed,
+  onReveal,
 }: {
   character: Character;
   photocard: Photocard | null;
   drawing: boolean;
   printing: boolean;
+  revealed: boolean;
+  onReveal: () => void;
 }) {
   const animation = printing ? "anim-card-print" : "anim-card-appear";
 
   if (photocard) {
     return (
-      // 완성 카드는 뒷면 → 빛 리본 → 뒤집기 연출(CardReveal) 뒤에 나온다. 출력할 때는 카드째 아래로 내려간다.
-      <CardReveal className={printing ? "anim-card-print" : ""}>
+      // 완성 카드는 뒷면이 빛 리본에 감겨 나오고, 누르면 뒤집혀 앞면이 보인다(CardReveal). 출력할 때는 카드째 아래로 내려간다.
+      <CardReveal revealed={revealed} onReveal={onReveal} className={printing ? "anim-card-print" : ""}>
         {/* 백엔드가 만든 파일을 그대로 보여준다. 크기가 고정이라 next/image 최적화가 필요 없다. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

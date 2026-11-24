@@ -22,12 +22,15 @@
  *   - 2026-11-24 화면 멘트 정리: 마법 거울 문구를 카메라·솥 문구로, 얼굴 측정 때 사진 미저장 안내, '찰칵' 대신 포즈가 정해진다는 안내
  *   - 2026-11-24 끓는 중 화면: 얼굴 수치 터미널 대신 솥을 가운데 크게 두고 단계 표시(BrewingProgress), 질문 화면: 솥 작게·질문 크게, 재료 이름을 읽히는 크기로
  *   - 2026-11-24 "카드 준비 중" 화면 없앰: 그림까지 솥에서 끓인 뒤, 솥이 번쩍하며 카드 등장 연출(CardReveal)이 바로 시작되게 함 (펑 문구 제거)
+ *   - 2026-11-24 솥에서 나온 카드는 뒷면으로 기다리다 누르면 앞면이 보이고, 그 뒤 "내 카드 인쇄하기"로 실제 인쇄(100×148mm)
  */
 
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Cauldron, { type CauldronMood } from "@/components/Cauldron";
+import { createPortal } from "react-dom";
+
 import CharacterResult from "@/components/CharacterResult";
 import LandmarkOverlay, { type OverlayHandle } from "@/components/LandmarkOverlay";
 import PoseOverlay, { type PoseOverlayHandle } from "@/components/PoseOverlay";
@@ -39,6 +42,7 @@ import { useFaceLandmarker } from "@/hooks/useFaceLandmarker";
 import { usePoseLandmarker } from "@/hooks/usePoseLandmarker";
 import { useWebcam } from "@/hooks/useWebcam";
 import {
+  assetUrl,
   type Answers,
   type Character,
   CharacterApiError,
@@ -140,6 +144,8 @@ export default function ObservatoryFlow() {
   const [cardFailure, setCardFailure] = useState<CharacterApiError | null>(null);
   // 카드가 나타나는 순간 화면을 덮는 번쩍임 (카드 연출과 동시에 시작한다)
   const [flash, setFlash] = useState(false);
+  // 솥에서 나온 카드는 뒷면으로 기다리다가, 누르면 앞면이 보인다
+  const [revealed, setRevealed] = useState(false);
   // 찍은 포즈 뼈대 그림. 화면에 그리지 않고 포토카드 요청에만 쓴다.
   const poseSkeletonRef = useRef<string | null>(null);
   const handGesturesRef = useRef<HandGesture[]>([]);
@@ -296,6 +302,7 @@ export default function ObservatoryFlow() {
     setDrawing(false);
     setCardFailure(null);
     setFlash(false);
+    setRevealed(false);
     setProgress(0);
     setHold(0);
     setStep("align");
@@ -318,11 +325,20 @@ export default function ObservatoryFlow() {
     if (step === "spell") setHold(0);
   }, [step]);
 
-  // 포토카드가 완성됐거나, 다시 그려도 소용없는 실패면 글 카드로라도 마무리한다
+  const revealCard = useCallback(() => {
+    if (photocard) setRevealed(true);
+  }, [photocard]);
+
+  // 앞면을 본 뒤 인쇄한다. 인쇄 창이 닫히면 카드가 아래로 내려가며 다음 참가자로 넘어간다.
+  // 다시 그려도 소용없는 실패면 글 카드로라도 마무리한다.
   const pressCard = useCallback(() => {
-    if (photocard || (cardFailure && !cardFailure.retryable)) setStep("printing");
+    if (photocard && !revealed) setRevealed(true);
+    else if (photocard) {
+      window.print();
+      setStep("printing");
+    } else if (cardFailure && !cardFailure.retryable) setStep("printing");
     else if (cardFailure && character) drawCard(character);
-  }, [photocard, cardFailure, character, drawCard]);
+  }, [photocard, revealed, cardFailure, character, drawCard]);
 
   useArcadeButton({
     onPress: () => {
@@ -577,6 +593,8 @@ export default function ObservatoryFlow() {
             photocard={photocard}
             drawing={drawing}
             printing={step === "printing"}
+            revealed={revealed}
+            onReveal={revealCard}
           />
           {step === "card" && drawing && (
             <p role="status">솥에서 모습이 떠오르고 있어요. 조금만 기다려 주세요</p>
@@ -598,11 +616,29 @@ export default function ObservatoryFlow() {
               </div>
             </div>
           )}
-          {step === "card" && photocard && (
-            <button type="button" onClick={pressCard} className={primaryButton}>
-              버튼을 누르면 카드가 완성돼요
+          {step === "card" && photocard && !revealed && (
+            <p className="anim-card-appear text-xl text-amber-100" role="status">
+              카드를 눌러서 내 부캐를 확인해 보세요
+            </p>
+          )}
+          {step === "card" && photocard && revealed && (
+            // 카드가 다 뒤집힌 뒤에 나타난다
+            <button
+              type="button"
+              onClick={pressCard}
+              className={`anim-card-appear ${primaryButton}`}
+              style={{ animationDelay: "1.1s" }}
+            >
+              내 카드 인쇄하기
             </button>
           )}
+          {/* 인쇄할 때만 보이는 카드 이미지. body 바로 아래에 둬야 인쇄 때 나머지 화면을 통째로 뺄 수 있다 (globals.css의 .print-card) */}
+          {photocard &&
+            createPortal(
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={assetUrl(photocard.card_url)} alt="" className="print-card" />,
+              document.body,
+            )}
         </>
       )}
     </div>

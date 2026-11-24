@@ -1,23 +1,27 @@
 /**
  * 카드 등장 빛 효과 (revealFx)
  *
- * 역할: 카드 뒷면 주위를 빛 리본이 나선으로 감아 돌고, 불씨 같은 반짝이가 흩날리다가
- *       빛이 터지는 순간 카드가 뒤집히도록 캔버스 두 장(카드 뒤 / 카드 앞)에 그린다.
+ * 역할: 카드 뒷면 주위를 빛 리본이 나선으로 감아 돌고 불씨가 흩날린다. reveal()을 부르기 전까지 계속 돌고,
+ *       부르면 빛이 터지며 카드가 뒤집혀 앞면이 나온다. 빛은 캔버스 두 장(카드 뒤 / 카드 앞)에 그리고,
+ *       카드의 흔들림과 뒤집기도 같은 프레임에서 직접 돌린다.
  * 비고: 리본이 카드를 "감싸는" 것처럼 보이도록 타원의 앞쪽 반은 앞 캔버스에, 뒤쪽 반은 뒤 캔버스에 그린다.
  *       색은 부스 콘셉트 색: 골드 리본이 주인공이고 보라·에메랄드 리본이 한 줄씩 섞인다.
- *       시간표(초)는 REVEAL_TIMING에 모아 두었고, 카드 뒤집기 CSS(globals.css의 reveal-card)와 맞춰야 한다.
+ *       시간표(초)는 REVEAL_TIMING에 모아 두었다.
  *
  * 수정 이력:
  *   - 2026-11-24 최초 작성 (레퍼런스 영상 구성을 따라 나선 리본·불씨·빛살로 다시 만듦)
+ *   - 2026-11-24 카드를 눌러야 뒤집히도록 변경: 누르기 전까지 리본이 계속 돌고, reveal()에서 빛살과 함께 뒤집힘
  */
 
-/** 연출 시간표 (초). 카드가 옆면을 보이는 순간(flip 중간)에 빛이 가장 세다. */
+/** 연출 시간표 (초). 뒤집기 관련 값은 reveal()을 부른 순간부터 센다. */
 export const REVEAL_TIMING = {
   ribbonsIn: 0.25, // 리본이 나타나기 시작
-  burst: 3.2, // 빛살이 터지고 카드가 뒤집히기 시작
-  flipEnd: 4.1, // 카드 앞면이 정면을 봄 (globals.css의 reveal-card 길이와 같다)
-  end: 5.2, // 효과가 완전히 사라짐
+  flipDelay: 0.15, // 누른 뒤 뒤집기 시작까지
+  flip: 0.9, // 뒤집히는 시간
+  linger: 1.2, // 앞면이 나온 뒤 빛이 사라지는 시간
 };
+
+export type RevealFx = { reveal: () => void; stop: () => void };
 
 type Rgb = readonly [number, number, number];
 
@@ -59,7 +63,13 @@ const smooth = (a: number, b: number, t: number) => {
  * 효과를 시작한다. 캔버스 두 장은 카드보다 크게(카드 중심이 캔버스 중심) 놓여 있어야 한다.
  * 돌려주는 함수를 부르면 멈춘다.
  */
-export function runRevealFx(back: HTMLCanvasElement, front: HTMLCanvasElement, cardW: number, cardH: number): () => void {
+export function runRevealFx(
+  back: HTMLCanvasElement,
+  front: HTMLCanvasElement,
+  card: HTMLElement,
+  cardW: number,
+  cardH: number,
+): RevealFx {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const W = back.clientWidth;
   const H = back.clientHeight;
@@ -69,7 +79,7 @@ export function runRevealFx(back: HTMLCanvasElement, front: HTMLCanvasElement, c
   }
   const bctx = back.getContext("2d");
   const fctx = front.getContext("2d");
-  if (!bctx || !fctx) return () => {};
+  if (!bctx || !fctx) return { reveal: () => (card.style.transform = "rotateY(180deg)"), stop: () => {} };
   bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -110,6 +120,8 @@ export function runRevealFx(back: HTMLCanvasElement, front: HTMLCanvasElement, c
   let last = start;
   let frame = 0;
   let burstDone = false;
+  let revealAt: number | null = null;
+  let running = true;
 
   const draw = (now: number) => {
     const t = (now - start) / 1000;
@@ -120,12 +132,25 @@ export function runRevealFx(back: HTMLCanvasElement, front: HTMLCanvasElement, c
     bctx.globalCompositeOperation = "lighter";
     fctx.globalCompositeOperation = "lighter";
 
-    const { ribbonsIn, burst, flipEnd, end } = REVEAL_TIMING;
+    const { ribbonsIn } = REVEAL_TIMING;
+    // 누르기 전에는 뒤집기 시각을 아주 먼 미래로 두어 리본이 계속 돈다
+    const burst = revealAt ?? 1e9;
+    const flipStart = burst + REVEAL_TIMING.flipDelay;
+    const flipEnd = flipStart + REVEAL_TIMING.flip;
+    const end = flipEnd + REVEAL_TIMING.linger;
+
+    // 카드: 누르기 전에는 천천히 흔들리고, 누르면 흔들림을 풀며 앞면으로 뒤집힌다
+    const p = clamp01((t - flipStart) / REVEAL_TIMING.flip);
+    const eased = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+    const swayY = -12 * Math.sin(t * 1.2);
+    const swayX = 5 * Math.cos(t * 0.9);
+    card.style.transform = `rotateX(${swayX * (1 - eased)}deg) rotateY(${swayY * (1 - eased) + 180 * eased}deg)`;
+
     // 리본: 서서히 나타나 burst까지 감아 돌고, 그 뒤 바깥으로 퍼지며 사라진다
     const ribbonAlpha = smooth(ribbonsIn, ribbonsIn + 0.6, t) * (1 - smooth(burst + 0.1, burst + 0.9, t));
     const spread = 1 + 0.9 * smooth(burst, burst + 0.9, t);
     // 카드 뒤 은은한 빛: 점점 세지다가 burst에서 가장 밝고, 끝에는 조금만 남는다
-    const aura = 0.25 + 0.45 * smooth(0.3, burst, t) + 0.6 * smooth(burst - 0.2, burst + 0.35, t) * (1 - smooth(flipEnd, end, t));
+    const aura = 0.25 + 0.45 * smooth(0.3, 2.5, t) + 0.6 * smooth(burst - 0.1, burst + 0.4, t) * (1 - smooth(flipEnd, end, t));
 
     // 1) 떠다니는 먼지 별 (뒤)
     for (const d of dust) {
@@ -147,7 +172,7 @@ export function runRevealFx(back: HTMLCanvasElement, front: HTMLCanvasElement, c
     bctx.fillRect(0, 0, W, H);
 
     // 3) 빛살: burst 직전부터 천천히 돌며 퍼진다
-    const rays = smooth(burst - 0.35, burst + 0.25, t) * (1 - 0.75 * smooth(flipEnd - 0.2, end, t));
+    const rays = smooth(burst, burst + 0.4, t) * (1 - 0.75 * smooth(flipEnd - 0.2, end, t));
     if (rays > 0.01) {
       const count = 22;
       const reach = Math.hypot(W, H) * 0.55;
@@ -257,7 +282,7 @@ export function runRevealFx(back: HTMLCanvasElement, front: HTMLCanvasElement, c
     }
 
     // 7) 카드가 옆면을 보이는 순간 앞쪽에 짧은 섬광 (앞뒤가 바뀌는 순간을 가린다)
-    const flashT = (burst + flipEnd) / 2;
+    const flashT = (flipStart + flipEnd) / 2;
     const flash = Math.exp(-Math.pow((t - flashT) / 0.16, 2));
     if (flash > 0.01) {
       const fg = fctx.createRadialGradient(cx, cy, 0, cx, cy, cardH * 0.7);
@@ -271,10 +296,17 @@ export function runRevealFx(back: HTMLCanvasElement, front: HTMLCanvasElement, c
     if (t < end || embers.length > 0) {
       frame = requestAnimationFrame(draw);
     } else {
+      running = false;
       bctx.clearRect(0, 0, W, H);
       fctx.clearRect(0, 0, W, H);
+      card.style.transform = "rotateY(180deg)";
     }
   };
   frame = requestAnimationFrame(draw);
-  return () => cancelAnimationFrame(frame);
+  return {
+    reveal: () => {
+      if (revealAt === null && running) revealAt = (performance.now() - start) / 1000;
+    },
+    stop: () => cancelAnimationFrame(frame),
+  };
 }
