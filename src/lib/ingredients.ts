@@ -16,6 +16,7 @@
  *   - 2026-11-22 캐릭터 유형 재료 이름을 선택지와 바로 연결되게 변경 (말하는 찻주전자 → 사물 머리)
  *   - 2026-11-22 동물 머리 재료 이름을 '작은 발자국'에서 '동물 머리'로 변경
  *   - 2026-11-24 어색한 재료 이름 교체 (속삭이는 뇌, 녹슨 검 등)
+ *   - 2026-11-24 얼굴 재료를 동물상 유사도 재료(faceLookIngredients)로 교체. faceIngredients는 남겨 둠
  */
 
 import type { IconType } from "react-icons";
@@ -60,6 +61,7 @@ import {
   GiWrappedSweet,
 } from "react-icons/gi";
 import type { FaceFeatures } from "@/lib/faceFeatures";
+import type { FaceLook } from "@/lib/faceLook";
 
 type IngredientLook = { Icon: IconType; label: string; color: string };
 
@@ -94,6 +96,16 @@ export function faceIngredients(features: FaceFeatures): Ingredient[] {
     pick("gaze", GAZE, tier(features.eye_spacing_ratio, 0.4, 0.46)),
     pick("presence", PRESENCE, tier(features.jaw_width_ratio, 0.78, 0.88)),
   ];
+}
+
+/** 얼굴 분석에서 가장 닮은 동물상 3개를 "여우상 41%" 같은 재료로 만든다 */
+export function faceLookIngredients(look: FaceLook): Ingredient[] {
+  return look.animals.slice(0, 3).map(({ animal, percent }) => ({
+    key: `look:${animal.key}`,
+    Icon: animal.Icon,
+    label: `${animal.label} ${percent}%`,
+    color: animal.color,
+  }));
 }
 
 // 설문 선택지별 재료. 키는 lib/characterApi.ts 의 QUESTIONS 값과 같다.

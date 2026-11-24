@@ -23,6 +23,7 @@
  *   - 2026-11-24 끓는 중 화면: 얼굴 수치 터미널 대신 솥을 가운데 크게 두고 단계 표시(BrewingProgress), 질문 화면: 솥 작게·질문 크게, 재료 이름을 읽히는 크기로
  *   - 2026-11-24 "카드 준비 중" 화면 없앰: 그림까지 솥에서 끓인 뒤, 솥이 번쩍하며 카드 등장 연출(CardReveal)이 바로 시작되게 함 (펑 문구 제거)
  *   - 2026-11-24 솥에서 나온 카드는 뒷면으로 기다리다 누르면 앞면이 보이고, 그 뒤 "내 카드 인쇄하기"로 실제 인쇄(100×148mm)
+ *   - 2026-11-24 얼굴 세부 수치 14개로 동물상 유사도를 계산해 상위 3개를 재료로 넣고, 질문 화면에 AI 얼굴 분석 패널 표시
  */
 
 "use client";
@@ -32,6 +33,7 @@ import Cauldron, { type CauldronMood } from "@/components/Cauldron";
 import { createPortal } from "react-dom";
 
 import CharacterResult from "@/components/CharacterResult";
+import FaceLookPanel from "@/components/FaceLookPanel";
 import LandmarkOverlay, { type OverlayHandle } from "@/components/LandmarkOverlay";
 import PoseOverlay, { type PoseOverlayHandle } from "@/components/PoseOverlay";
 import SurveyStep from "@/components/SurveyStep";
@@ -57,9 +59,10 @@ import {
   extractFeatures,
   type FaceFeatures,
 } from "@/lib/faceFeatures";
+import { analyzeFaceLook, averageDetail, type FaceDetail, type FaceLook, measureFace } from "@/lib/faceLook";
 import {
   ANSWER_INGREDIENTS,
-  faceIngredients,
+  faceLookIngredients,
   type Ingredient,
 } from "@/lib/ingredients";
 import {
@@ -122,6 +125,8 @@ export default function ObservatoryFlow() {
     null,
   );
   const samplesRef = useRef<FaceFeatures[]>([]);
+  // 동물상 분석용 세부 수치 (화면 연출용, 백엔드로 보내지 않는다)
+  const detailSamplesRef = useRef<FaceDetail[]>([]);
   const scanStartRef = useRef(0);
   const holdFrameRef = useRef(0);
   // 화면이 다음 단계로 바뀌기 전에 프레임이 더 들어와도 측정 완료를 한 번만 처리한다
@@ -135,6 +140,7 @@ export default function ObservatoryFlow() {
   const [progress, setProgress] = useState(0);
   const [hold, setHold] = useState(0);
   const [features, setFeatures] = useState<FaceFeatures | null>(null);
+  const [faceLook, setFaceLook] = useState<FaceLook | null>(null);
   const [answers, setAnswers] = useState<Answers | null>(null);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [character, setCharacter] = useState<Character | null>(null);
@@ -170,6 +176,7 @@ export default function ObservatoryFlow() {
       // 측정 중 위치를 벗어나면 잘못된 값이 섞이지 않도록 처음부터 다시 한다
       if (current !== "ready") {
         samplesRef.current = [];
+        detailSamplesRef.current = [];
         setProgress(0);
         setStep("align");
         return;
@@ -177,11 +184,13 @@ export default function ObservatoryFlow() {
       const now = performance.now();
       if (samplesRef.current.length === 0) scanStartRef.current = now;
       samplesRef.current.push(extractFeatures(faces[0], aspect));
+      detailSamplesRef.current.push(measureFace(faces[0], aspect));
       const elapsed = now - scanStartRef.current;
       setProgress(Math.min(elapsed / SCAN_MS, 1));
       if (elapsed >= SCAN_MS && samplesRef.current.length >= SCAN_MIN_SAMPLES) {
         scanFinishedRef.current = true;
         setFeatures(averageFeatures(samplesRef.current));
+        setFaceLook(analyzeFaceLook(averageDetail(detailSamplesRef.current)));
         latestPoseRef.current = null;
         setPoseCount(POSE_SECONDS);
         setPoseAttempt(0);
@@ -215,18 +224,19 @@ export default function ObservatoryFlow() {
       poseSkeletonRef.current = skeleton;
       handGesturesRef.current = gestures;
       setStep("survey");
-      if (!features) return;
-      // 측정값이 재료로 변해 하나씩 항아리에 빠진다
-      faceIngredients(features).forEach((ingredient, index) => {
+      if (!faceLook) return;
+      // 얼굴 분석 결과(닮은 동물상 상위 3개)가 재료로 변해 하나씩 항아리에 빠진다
+      faceLookIngredients(faceLook).forEach((ingredient, index) => {
         setTimeout(() => addIngredient(ingredient), index * INGREDIENT_GAP_MS);
       });
     },
-    [features, addIngredient],
+    [faceLook, addIngredient],
   );
 
   const begin = useCallback(() => {
     if (step !== "align" || alignment !== "ready") return;
     samplesRef.current = [];
+    detailSamplesRef.current = [];
     scanFinishedRef.current = false;
     setProgress(0);
     setCount(COUNTDOWN_SECONDS);
@@ -288,7 +298,9 @@ export default function ObservatoryFlow() {
   // 다음 참가자를 위해 이전 참가자의 데이터를 모두 지운다
   const restart = useCallback(() => {
     samplesRef.current = [];
+    detailSamplesRef.current = [];
     setFeatures(null);
+    setFaceLook(null);
     setAnswers(null);
     setIngredients([]);
     setCharacter(null);
@@ -505,6 +517,7 @@ export default function ObservatoryFlow() {
                 ))}
               </ul>
             )}
+            {step !== "brewing" && faceLook && <FaceLookPanel look={faceLook} />}
           </div>
 
           <div className="flex flex-col items-center gap-4">
