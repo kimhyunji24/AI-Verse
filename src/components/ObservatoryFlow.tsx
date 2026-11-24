@@ -21,6 +21,7 @@
  *   - 2026-11-22 포즈 단계에서 손가락과 손 모양을 잡아 뼈대 그림과 포토카드 요청에 반영, 인식한 손 모양 표시
  *   - 2026-11-24 화면 멘트 정리: 마법 거울 문구를 카메라·솥 문구로, 얼굴 측정 때 사진 미저장 안내, '찰칵' 대신 포즈가 정해진다는 안내
  *   - 2026-11-24 끓는 중 화면: 얼굴 수치 터미널 대신 솥을 가운데 크게 두고 단계 표시(BrewingProgress), 질문 화면: 솥 작게·질문 크게, 재료 이름을 읽히는 크기로
+ *   - 2026-11-24 "카드 준비 중" 화면 없앰: 그림까지 솥에서 끓인 뒤, 솥이 번쩍하며 카드 등장 연출(CardReveal)이 바로 시작되게 함 (펑 문구 제거)
  */
 
 "use client";
@@ -77,7 +78,6 @@ type Step =
   | "spell"
   | "brewing"
   | "failed"
-  | "burst"
   | "card"
   | "printing";
 
@@ -138,6 +138,8 @@ export default function ObservatoryFlow() {
   const [photocard, setPhotocard] = useState<Photocard | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [cardFailure, setCardFailure] = useState<CharacterApiError | null>(null);
+  // 카드가 나타나는 순간 화면을 덮는 번쩍임 (카드 연출과 동시에 시작한다)
+  const [flash, setFlash] = useState(false);
   // 찍은 포즈 뼈대 그림. 화면에 그리지 않고 포토카드 요청에만 쓴다.
   const poseSkeletonRef = useRef<string | null>(null);
   const handGesturesRef = useRef<HandGesture[]>([]);
@@ -260,9 +262,11 @@ export default function ObservatoryFlow() {
           minimumBrew,
         ]);
         setCharacter(created);
-        setStep("burst");
+        // 그림까지 솥에서 끓인다. "카드 준비 중" 화면 없이, 다 되면 솥이 번쩍하며 카드 연출이 바로 시작된다.
+        await drawCard(created);
+        setStep("card");
+        setFlash(true);
         playPoof();
-        drawCard(created);
       } catch (error) {
         setFailure(
           error instanceof CharacterApiError
@@ -291,6 +295,7 @@ export default function ObservatoryFlow() {
     setPhotocard(null);
     setDrawing(false);
     setCardFailure(null);
+    setFlash(false);
     setProgress(0);
     setHold(0);
     setStep("align");
@@ -375,15 +380,17 @@ export default function ObservatoryFlow() {
   }, [step, poseStatus, poseCount, poseAttempt, finishPose]);
 
   useEffect(() => {
-    if (step === "burst") {
-      const timer = setTimeout(() => setStep("card"), BURST_MS);
-      return () => clearTimeout(timer);
-    }
     if (step === "printing") {
       const timer = setTimeout(restart, PRINT_MS);
       return () => clearTimeout(timer);
     }
   }, [step, restart]);
+
+  useEffect(() => {
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(false), BURST_MS);
+    return () => clearTimeout(timer);
+  }, [flash]);
 
   const showCamera =
     step === "align" || step === "countdown" || step === "scan" || step === "pose";
@@ -553,15 +560,13 @@ export default function ObservatoryFlow() {
         </div>
       )}
 
-      {step === "burst" && (
+      {flash && (
         <div
           data-testid="poof"
-          className="pointer-events-none fixed inset-0 z-10 flex items-center justify-center"
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center"
         >
-          <div className="anim-poof absolute h-[70vmin] w-[70vmin] rounded-full bg-white blur-3xl" />
-          <p className="font-display anim-card-appear relative text-5xl text-purple-950">
-            나야, 부캐
-          </p>
+          {/* 솥이 번쩍하는 빛. 아래에서 카드 연출이 동시에 시작돼 빛이 걷히면 카드 뒷면이 떠오른다. */}
+          <div className="anim-poof absolute h-[80vmin] w-[80vmin] rounded-full bg-[#fff3d1] blur-3xl" />
         </div>
       )}
 
