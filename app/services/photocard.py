@@ -4,7 +4,8 @@
 역할: 캐릭터 정보와 일러스트를 100×148mm(300dpi) 세로 풀아트 홀로그램 카드 PNG 한 장으로 합성한다.
 비고: SELPHY CP1500 엽서 크기(100×148mm)에 맞췄다. 인쇄는 아직 연결하지 않았고 파일로만 저장한다.
       템플릿 구성: 일러스트는 정보 패널 위 영역(ART_BOX)을 채우고 패널 뒤는 같은 그림을 흐리게 깔아 풀아트처럼 보이게 하며, 무지개 홀로 포일 테두리와 광택·반짝이를 겹친 뒤,
-      아래쪽 유리 패널에 이름·등급·속성·대표 능력치, 고유 능력, 2027년 메시지를 얹고 꼬리말에 카드 번호를 둔다.
+      위쪽에 등급·이름·속성·대표 능력치, 아래쪽 유리 패널에 고유 능력·2027년 메시지·카드 번호를 얹는다.
+      그림은 가로폭에 맞춰 비율 그대로 위에 놓아 좌우가 잘리지 않게 한다.
       반짝이 위치는 카드 번호로 정해서 카드마다 다르게 나온다. 같은 번호면 늘 같은 카드가 나온다.
       한글 글꼴은 CARD_FONT 환경변수로 바꿀 수 있다. 지정하지 않으면 macOS 기본 글꼴을 찾아 쓴다.
 
@@ -21,6 +22,8 @@
   - 2026-11-24 캐릭터가 잘리지 않게 그림 전체를 프레임 안쪽 안전 영역에 비율 그대로 배치 (잘라서 채우지 않음)
   - 2026-11-24 정보 패널 정리: 능력치 6칸과 설명 없는 위력 숫자 제거, 2027년 메시지를 크게, 꼬리말 단순화
   - 2026-11-24 패널을 더 덜어냄: 성향·럭키 아이템 줄을 빼고 패널을 낮춰 그림과 패널 사이에 여유를 둠
+  - 2026-11-24 팀 피드백으로 무지개 홀로 풀아트 템플릿으로 되돌림 (천체 프레임 제거). 패널은 고유 능력·2027년 메시지·꼬리말만 남기고,
+               그림은 가로폭에 맞춰 비율 그대로 배치해 좌우가 잘리지 않게 함
 """
 
 import colorsys
@@ -37,26 +40,19 @@ from app.schemas import CharacterResponse
 
 # 100×148mm @ 300dpi
 WIDTH, HEIGHT = 1181, 1748
+FRAME = 30  # 홀로 포일 테두리 두께
+RADIUS = 56
+PAD = 72  # 카드 가장자리에서 글자까지
 # 정보 패널이 시작하는 높이. 일러스트는 이 위에만 선명하게 배치해 캐릭터가 패널에 가려지지 않게 한다.
-PANEL_TOP = 1175
-# 선명한 일러스트 자리: 프레임 장식(테두리, 양옆 메달)과 패널에 가리지 않는 안쪽 정사각형.
-# 그림을 자르지 않고 이 안에 통째로 넣어 캐릭터가 절대 잘리지 않게 한다.
-ART_SIDE = 1181 - 150 * 2
-ART_LEFT = 150
-# 프레임 위 장식 아래(130)부터 패널 위까지 남는 높이의 가운데
-ART_TOP = (130 + PANEL_TOP - 22 - ART_SIDE) // 2
+PANEL_TOP = HEIGHT - FRAME - 380
 # 그림 위를 지나가는 빛줄기 세기 (0~1). 높이면 홀로 느낌이 세지지만 그림이 바랜다.
 GLOSS_STRENGTH = 0.3
-# 프레임 이미지: 금색 선이 어두운 바탕 위에 그려진 그림. 화면(screen) 합성으로 밝은 선만 얹는다.
-# 없으면 같은 자리에 단순한 금색 선 프레임을 그린다. 경로는 CARD_FRAME 환경변수로 바꿀 수 있다.
-DEFAULT_FRAME_PATH = "output/frame.jpeg"
-# 프레임 장식(모서리, 옆·아래 메달)을 피한 안쪽 영역
-SAFE_X = 150
-PANEL_BOTTOM = 1585
-FOOTER_Y = 1610
+CONTENT = WIDTH - PAD * 2
 
 WHITE = (255, 255, 255)
 SHADOW = (12, 8, 24)
+# 투명 배경 일러스트를 얹을 밝은 바탕
+ART_BACKDROP = (250, 246, 238)
 GOLD = (255, 214, 120)
 
 STAT_LABELS = {
@@ -152,6 +148,9 @@ def _paragraph(draw, xy, text, font, width, fill, *, max_lines: int, spacing: fl
     return y
 
 
+def _outlined(draw, xy, text, font, fill=WHITE, *, stroke=4, anchor="la") -> None:
+    """일러스트 위에서도 읽히도록 어두운 외곽선을 두른 글자"""
+    draw.text(xy, text, font=font, fill=fill, anchor=anchor, stroke_width=stroke, stroke_fill=SHADOW)
 
 
 # ---------- 홀로그램 재료 ----------
@@ -188,6 +187,15 @@ def _gloss(size: tuple[int, int]) -> Image.Image:
     return band.transform(size, Image.AFFINE, (1, 0.55, 0, 0, 1, 0), Image.BICUBIC)
 
 
+def _sparkle(draw, center, radius, fill) -> None:
+    """네 갈래로 빛나는 반짝이"""
+    cx, cy = center
+    thin = radius * 0.18
+    draw.polygon(
+        [(cx, cy - radius), (cx + thin, cy - thin), (cx + radius, cy), (cx + thin, cy + thin),
+         (cx, cy + radius), (cx - thin, cy + thin), (cx - radius, cy), (cx - thin, cy - thin)],
+        fill=fill,
+    )
 
 
 def _star(draw, center, radius, fill) -> None:
@@ -212,6 +220,12 @@ def _vertical_fade(size, stops: list[tuple[float, int]]) -> Image.Image:
     return column.resize(size)
 
 
+def _rounded_mask(size, radius, inset=0) -> Image.Image:
+    mask = Image.new("L", size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (inset, inset, size[0] - 1 - inset, size[1] - 1 - inset), radius=max(radius - inset, 0), fill=255
+    )
+    return mask
 
 
 def _cover(image: Image.Image, size: tuple[int, int]) -> Image.Image:
@@ -223,10 +237,6 @@ def _cover(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     return resized.crop((left, top, left + size[0], top + size[1]))
 
 
-# 이미지 모델이 배경을 투명하게 줄 때 깔아 줄 밝은 바탕색
-ART_BACKDROP = (250, 246, 238)
-
-
 def _flatten(image: Image.Image) -> Image.Image:
     """투명한 부분이 있으면 밝은 바탕에 얹는다. 그냥 RGB로 바꾸면 투명한 곳이 검게 나온다."""
     if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
@@ -234,19 +244,6 @@ def _flatten(image: Image.Image) -> Image.Image:
         backdrop = Image.new("RGBA", rgba.size, (*ART_BACKDROP, 255))
         return Image.alpha_composite(backdrop, rgba).convert("RGB")
     return image.convert("RGB")
-
-
-@lru_cache(maxsize=2)
-def _frame(size: tuple[int, int]) -> Image.Image:
-    path = os.getenv("CARD_FRAME", DEFAULT_FRAME_PATH)
-    if os.path.exists(path):
-        return Image.open(path).convert("RGB").resize(size, Image.LANCZOS)
-    # 프레임 파일이 없을 때: 같은 자리에 금색 이중선만 그린다
-    frame = Image.new("RGB", size, (0, 0, 0))
-    draw = ImageDraw.Draw(frame)
-    draw.rounded_rectangle((62, 62, size[0] - 63, size[1] - 63), radius=36, outline=GOLD, width=4)
-    draw.rounded_rectangle((84, 84, size[0] - 85, size[1] - 85), radius=24, outline=GOLD, width=2)
-    return frame
 
 
 def rarity(character: CharacterResponse) -> int:
@@ -269,18 +266,16 @@ def compose_card(
     stars = rarity(character)
     rarity_name, rarity_color = RARITIES[stars]
 
-    # 1) 일러스트: 카드 전체에 흐린 그림을 깔고, 프레임 안쪽 안전 영역에 선명한 그림을 통째로 얹는다.
-    #    자르지 않고 비율 그대로 줄여 넣으므로 머리·손·몸이 잘리거나 장식에 가리지 않는다.
+    # 1) 일러스트: 패널 뒤까지 흐린 그림을 깔고, 패널 위 영역에만 선명한 그림을 얹는다
+    #    가로폭에 맞춰 비율 그대로 늘려 위에 붙인다 (좌우를 잘라내지 않는다).
+    #    그림이 패널보다 길면 패널 위까지만 보이고, 아래 끝은 흐린 배경으로 자연스럽게 녹인다.
     art = _flatten(Image.open(io.BytesIO(illustration_png)))
     card = _cover(art, size).filter(ImageFilter.GaussianBlur(28))
-    card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.45)
-    scale = min(ART_SIDE / art.width, ART_SIDE / art.height)
-    sharp = art.resize((round(art.width * scale), round(art.height * scale)), Image.LANCZOS)
-    art_x = ART_LEFT + (ART_SIDE - sharp.width) // 2
-    art_y = ART_TOP + (ART_SIDE - sharp.height) // 2
-    edge = Image.new("L", sharp.size, 0)
-    ImageDraw.Draw(edge).rounded_rectangle((6, 6, sharp.width - 7, sharp.height - 7), radius=24, fill=255)
-    card.paste(sharp, (art_x, art_y), edge.filter(ImageFilter.GaussianBlur(5)))
+    card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.35)
+    art_height = min(round(art.height * WIDTH / art.width), PANEL_TOP + 40)
+    sharp = _cover(art, (WIDTH, art_height))
+    fade = _vertical_fade((WIDTH, art_height), [(0, 255), (max(0.0, 1 - 90 / art_height), 255), (1, 0)])
+    card.paste(sharp, (0, 0), fade)
 
     # 2) 홀로 광택: 그림이 뿌옇게 바래지 않도록 그림 위에는 무지개 막을 씌우지 않고,
     #    비스듬한 빛줄기만 약하게 지나가게 한다. 홀로 느낌은 테두리·배지·문장(紋章)이 맡는다.
@@ -294,92 +289,155 @@ def compose_card(
         shade,
         card,
         _vertical_fade(
-            size, [(0, 90), (0.1, 0), ((PANEL_TOP - 120) / HEIGHT, 0), (PANEL_TOP / HEIGHT, 150), (1, 235)]
+            size, [(0, 175), (0.17, 0), ((PANEL_TOP - 120) / HEIGHT, 0), (PANEL_TOP / HEIGHT, 150), (1, 235)]
         ),
     )
+    card = card.convert("RGBA")
 
-    # 4) 프레임: 금색 선과 별만 화면 합성으로 얹는다
-    card = ImageChops.screen(card, _frame(size))
+    # 4) 반짝이 (번진 빛 + 선명한 심)
+    sparkles = Image.new("RGBA", size, (0, 0, 0, 0))
+    sparkle_draw = ImageDraw.Draw(sparkles)
+    points = []
+    while len(points) < 6 + 4 * stars:
+        x, y = rng.uniform(FRAME + 20, WIDTH - FRAME - 20), rng.uniform(FRAME + 20, PANEL_TOP - 20)
+        # 이름과 대표 능력치 글자 위에는 반짝이를 올리지 않는다
+        if y < FRAME + 300 and (x < WIDTH * 0.55 or x > WIDTH * 0.62):
+            continue
+        # 캐릭터가 있는 가운데에는 올리지 않고 가장자리에만 둔다
+        if WIDTH * 0.22 < x < WIDTH * 0.78 and y > FRAME + 260:
+            continue
+        points.append((x, y, rng.uniform(7, 22)))
+    for x, y, r in points:
+        sparkle_draw.ellipse((x - r * 1.2, y - r * 1.2, x + r * 1.2, y + r * 1.2), fill=(255, 255, 255, 55))
+    sparkles = sparkles.filter(ImageFilter.GaussianBlur(10))
+    sparkle_draw = ImageDraw.Draw(sparkles)
+    for x, y, r in points:
+        _sparkle(sparkle_draw, (x, y), r, (255, 255, 255, 210))
+    card.alpha_composite(sparkles)
+
+    # 5) 홀로 포일 테두리 + 안쪽 가는 금선
+    foil = ImageChops.screen(_rainbow(size, angle_turns=3.2, offset=rng.random()), Image.new("RGB", size, (60, 60, 70)))
+    ring = ImageChops.subtract(_rounded_mask(size, RADIUS), _rounded_mask(size, RADIUS, FRAME))
+    card.paste(foil, (0, 0), ring)
     ui = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(ui)
+    draw.rounded_rectangle(
+        (FRAME, FRAME, WIDTH - FRAME, HEIGHT - FRAME), radius=RADIUS - FRAME, outline=(*GOLD, 255), width=4
+    )
+    draw.rounded_rectangle((2, 2, WIDTH - 3, HEIGHT - 3), radius=RADIUS, outline=(255, 255, 255, 160), width=3)
 
-    # 5) 아래 패널: 이름, 등급, 속성·대표 능력치, 고유 능력, 2027년 메시지 (성향·럭키 아이템은 화면에만)
-    panel = (SAFE_X - 14, PANEL_TOP, WIDTH - SAFE_X + 14, PANEL_BOTTOM)
-    content = panel[2] - panel[0] - 56
-    left = panel[0] + 28
-    right = panel[2] - 28
+    # 6) 위쪽: 등급, 이름, 종족 · 속성 / 오른쪽에 대표 능력치와 속성 문장(紋章)
+    y = FRAME + 34
+    rarity_font = _font(26, 800)
+    rarity_text = f"{rarity_name}"
+    star_x = PAD
+    for _ in range(stars):
+        _star(draw, (star_x + 13, y + 15), 14, (*rarity_color, 255))
+        star_x += 32
+    _outlined(draw, (star_x + 8, y + 15), rarity_text, rarity_font, rarity_color, stroke=3, anchor="lm")
+
+    emblem_r = 50
+    emblem_c = (WIDTH - PAD - emblem_r, y + 74)
+    halo = Image.new("RGBA", size, (0, 0, 0, 0))
+    ImageDraw.Draw(halo).ellipse(
+        (emblem_c[0] - 76, emblem_c[1] - 76, emblem_c[0] + 76, emblem_c[1] + 76), fill=(*rarity_color, 150)
+    )
+    ui.alpha_composite(halo.filter(ImageFilter.GaussianBlur(18)))
+    emblem = Image.new("L", size, 0)
+    ImageDraw.Draw(emblem).ellipse(
+        (emblem_c[0] - emblem_r, emblem_c[1] - emblem_r, emblem_c[0] + emblem_r, emblem_c[1] + emblem_r), fill=255
+    )
+    ui.paste(_rainbow(size, angle_turns=5, offset=0.3).convert("RGBA"), (0, 0), emblem)
+    draw = ImageDraw.Draw(ui)
+    draw.ellipse(
+        (emblem_c[0] - emblem_r, emblem_c[1] - emblem_r, emblem_c[0] + emblem_r, emblem_c[1] + emblem_r),
+        outline=(255, 255, 255, 255),
+        width=5,
+    )
+    _outlined(draw, emblem_c, character.element[:1], _font(48, 900), WHITE, stroke=3, anchor="mm")
+
+    number_font, label_font = _font(72, 900), _font(28, 800)
+    number = str(stats[top_key])
+    number_right = emblem_c[0] - emblem_r - 20
+    _outlined(draw, (number_right, y + 112), number, number_font, anchor="rs")
+    label_right = number_right - draw.textlength(number, font=number_font) - 10
+    _outlined(draw, (label_right, y + 104), STAT_LABELS[top_key], label_font, GOLD, stroke=3, anchor="rs")
+
+    name_font = _font(80, 900)
+    name_room = label_right - draw.textlength(STAT_LABELS[top_key], font=label_font) - PAD - 24
+    name_size = 80
+    while name_size > 52 and draw.textlength(character.name, font=_font(name_size, 900)) > name_room:
+        name_size -= 4
+    name_font = _font(name_size, 900)
+    _outlined(draw, (PAD, y + 120), _fit(draw, character.name, name_font, name_room), name_font, stroke=6, anchor="ls")
+    subtitle = f"{character.element} 속성" if character.race in character.name else f"{character.race} · {character.element} 속성"
+    _outlined(
+        draw,
+        (PAD, y + 140),
+        _fit(draw, subtitle, _font(30, 700), CONTENT),
+        _font(30, 700),
+        (235, 230, 255),
+        stroke=3,
+    )
+
+    # 7) 아래쪽 유리 패널
+    panel_top = PANEL_TOP
+    panel = (FRAME + 26, panel_top, WIDTH - FRAME - 26, HEIGHT - FRAME - 26)
     glass = Image.new("RGBA", size, (0, 0, 0, 0))
-    ImageDraw.Draw(glass).rounded_rectangle(panel, radius=28, fill=(12, 10, 28, 190), outline=(*GOLD, 150), width=2)
+    glass_draw = ImageDraw.Draw(glass)
+    glass_draw.rounded_rectangle(panel, radius=34, fill=(20, 14, 40, 150), outline=(255, 255, 255, 90), width=2)
     ui.alpha_composite(glass)
     draw = ImageDraw.Draw(ui)
 
-    y = PANEL_TOP + 26
-    # 등급: 오른쪽 위 별
-    star_x = right - 13
-    for _ in range(stars):
-        _star(draw, (star_x, y + 22), 15, (*rarity_color, 255))
-        star_x -= 34
-    rarity_font = _font(22, 800)
-    draw.text((star_x + 8, y + 22), rarity_name, font=rarity_font, fill=rarity_color, anchor="rm")
-    rarity_width = right - star_x + draw.textlength(rarity_name, font=rarity_font) + 20
-
-    # 이름: 길면 글자를 줄인다 (64 → 최소 40)
-    name_room = content - rarity_width
-    name_size = 64
-    while name_size > 40 and draw.textlength(character.name, font=_font(name_size, 900)) > name_room:
-        name_size -= 4
-    name_font = _font(name_size, 900)
-    draw.text((left, y + 48), _fit(draw, character.name, name_font, name_room), font=name_font, fill=GOLD, anchor="ls")
-    y += 64
-    subtitle = (
-        f"{character.element} 속성"
-        if character.race in character.name
-        else f"{character.race} · {character.element} 속성"
-    )
-    subtitle += f"  ·  {STAT_LABELS[top_key]} {stats[top_key]}"
-    draw.text((left, y), _fit(draw, subtitle, _font(24, 600), content), font=_font(24, 600), fill=(215, 208, 240))
-    y += 44
-    draw.line((left, y, right, y), fill=(*GOLD, 90), width=2)
-    y += 16
-
-    # 고유 능력
-    badge_font = _font(20, 800)
-    badge = (left, y, left + 108, y + 36)
-    draw.rounded_rectangle(badge, radius=18, fill=(*GOLD, 255))
-    draw.text(((badge[0] + badge[2]) / 2, y + 18), "고유 능력", font=badge_font, fill=SHADOW, anchor="mm")
-    ability_font = _font(32, 800)
+    # 고유 능력: 홀로 배지 + 능력 이름
+    y = panel_top + 34
+    badge_font = _font(24, 800)
+    badge = (PAD, y, PAD + 132, y + 44)
+    badge_mask = Image.new("L", size, 0)
+    ImageDraw.Draw(badge_mask).rounded_rectangle(badge, radius=22, fill=255)
+    ui.paste(_rainbow(size, angle_turns=4, offset=0.55).convert("RGBA"), (0, 0), badge_mask)
+    draw = ImageDraw.Draw(ui)
+    draw.text(((badge[0] + badge[2]) / 2, y + 22), "고유 능력", font=badge_font, fill=SHADOW, anchor="mm")
+    ability_font = _font(40, 800)
     draw.text(
-        (badge[2] + 14, y + 18),
-        _fit(draw, character.ability, ability_font, content - (badge[2] - left) - 14),
+        (badge[2] + 18, y + 22),
+        _fit(draw, character.ability, ability_font, CONTENT - (badge[2] - PAD) - 18),
         font=ability_font,
         fill=WHITE,
         anchor="lm",
     )
-    y += 56
-    draw.line((left, y, right, y), fill=(*GOLD, 70), width=2)
-    y += 20
+    y += 44 + 28
+    draw.line((PAD, y, WIDTH - PAD, y), fill=(255, 255, 255, 60), width=2)
+    y += 26
 
-    # 2027년 메시지: 카드에서 가장 크게 읽히는 글
-    draw.text((left, y), "2027년의 너에게", font=_font(24, 800), fill=GOLD)
-    y += 42
-    _paragraph(
+    # 2027년 메시지: 왼쪽에 홀로 막대
+    draw.text((PAD + 22, y), "2027년의 너에게", font=_font(26, 800), fill=GOLD)
+    y += 46
+    message_end = _paragraph(
         draw,
-        (left, y),
+        (PAD + 22, y),
         character.message_2027,
-        _font(29, 500),
-        content,
-        (244, 240, 230),
-        max_lines=max(1, (PANEL_BOTTOM - 18 - y) // 41),
+        _font(30, 500),
+        CONTENT - 22,
+        (240, 236, 255),
+        max_lines=3,
     )
+    bar = Image.new("L", size, 0)
+    ImageDraw.Draw(bar).rounded_rectangle((PAD, y - 44, PAD + 6, message_end - 10), radius=3, fill=255)
+    ui.paste(_rainbow(size, angle_turns=6).convert("RGBA"), (0, 0), bar)
+    draw = ImageDraw.Draw(ui)
 
-    # 6) 꼬리말: 아래 메달 양옆
-    footer_font = _font(20, 800)
-    draw.text((WIDTH * 0.27, FOOTER_Y), "이게 나라고?", font=footer_font, fill=GOLD, anchor="mm")
+    # 꼬리말: 부스 이름 / 카드 번호 · 1/1
+    footer_y = panel[3] - 34
+    footer_font = _font(22, 800)
+    draw.text((PAD, footer_y), "이게 나라고?", font=footer_font, fill=(210, 205, 235), anchor="lm")
     serial = f"No.{card_id[-4:].upper()} · 1/1" if card_id else "1/1"
-    draw.text((WIDTH * 0.73, FOOTER_Y), serial, font=footer_font, fill=GOLD, anchor="mm")
+    draw.text((WIDTH - PAD, footer_y), serial, font=footer_font, fill=GOLD, anchor="rm")
 
-    card = card.convert("RGBA")
     card.alpha_composite(ui)
-    final = card.convert("RGB")
+    # 테두리 바깥 모서리는 흰색으로 둔다 (인쇄 후 잘라도 깔끔하도록)
+    final = Image.new("RGB", size, WHITE)
+    final.paste(card.convert("RGB"), (0, 0), _rounded_mask(size, RADIUS))
 
     output = io.BytesIO()
     final.save(output, format="PNG", dpi=(300, 300))
