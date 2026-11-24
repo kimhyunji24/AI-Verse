@@ -18,6 +18,8 @@
   - 2026-11-22 긴 이름('~한 + 종족')은 말줄임 대신 글자 크기를 줄여 넣고, 이름에 종족이 있으면 아래 줄에서 종족을 뺌
   - 2026-11-22 타로풍 천체 프레임 이미지(CARD_FRAME)를 얹고, 이름·정보를 프레임 안쪽 아래 패널로 옮김 (무지개 테두리 대체)
   - 2026-11-22 투명 배경 일러스트가 검게 나오던 문제 수정 (밝은 바탕에 얹은 뒤 합성)
+  - 2026-11-24 캐릭터가 잘리지 않게 그림 전체를 프레임 안쪽 안전 영역에 비율 그대로 배치 (잘라서 채우지 않음)
+  - 2026-11-24 정보 패널 정리: 능력치 6칸과 설명 없는 위력 숫자 제거, 2027년 메시지를 크게, 꼬리말 단순화
 """
 
 import colorsys
@@ -36,8 +38,11 @@ from app.schemas import CharacterResponse
 WIDTH, HEIGHT = 1181, 1748
 # 정보 패널이 시작하는 높이. 일러스트는 이 위에만 선명하게 배치해 캐릭터가 패널에 가려지지 않게 한다.
 PANEL_TOP = 1090
-# 선명한 일러스트가 끝나는 높이 (패널 모서리 아래로 살짝 들어가 경계가 자연스럽게 보이게 한다)
-ART_BOTTOM = PANEL_TOP + 40
+# 선명한 일러스트 자리: 프레임 장식(테두리, 양옆 메달)과 패널에 가리지 않는 안쪽 정사각형.
+# 그림을 자르지 않고 이 안에 통째로 넣어 캐릭터가 절대 잘리지 않게 한다.
+ART_SIDE = 1181 - 150 * 2
+ART_LEFT = 150
+ART_TOP = 1090 - 22 - ART_SIDE
 # 그림 위를 지나가는 빛줄기 세기 (0~1). 높이면 홀로 느낌이 세지지만 그림이 바랜다.
 GLOSS_STRENGTH = 0.3
 # 프레임 이미지: 금색 선이 어두운 바탕 위에 그려진 그림. 화면(screen) 합성으로 밝은 선만 얹는다.
@@ -262,13 +267,18 @@ def compose_card(
     stars = rarity(character)
     rarity_name, rarity_color = RARITIES[stars]
 
-    # 1) 일러스트: 패널 뒤까지 흐린 그림을 깔고, 패널 위 영역에만 선명한 그림을 얹는다
+    # 1) 일러스트: 카드 전체에 흐린 그림을 깔고, 프레임 안쪽 안전 영역에 선명한 그림을 통째로 얹는다.
+    #    자르지 않고 비율 그대로 줄여 넣으므로 머리·손·몸이 잘리거나 장식에 가리지 않는다.
     art = _flatten(Image.open(io.BytesIO(illustration_png)))
     card = _cover(art, size).filter(ImageFilter.GaussianBlur(28))
-    card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.35)
-    sharp = _cover(art, (WIDTH, ART_BOTTOM))
-    fade = _vertical_fade((WIDTH, ART_BOTTOM), [(0, 255), ((PANEL_TOP - 30) / ART_BOTTOM, 255), (1, 0)])
-    card.paste(sharp, (0, 0), fade)
+    card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.45)
+    scale = min(ART_SIDE / art.width, ART_SIDE / art.height)
+    sharp = art.resize((round(art.width * scale), round(art.height * scale)), Image.LANCZOS)
+    art_x = ART_LEFT + (ART_SIDE - sharp.width) // 2
+    art_y = ART_TOP + (ART_SIDE - sharp.height) // 2
+    edge = Image.new("L", sharp.size, 0)
+    ImageDraw.Draw(edge).rounded_rectangle((6, 6, sharp.width - 7, sharp.height - 7), radius=24, fill=255)
+    card.paste(sharp, (art_x, art_y), edge.filter(ImageFilter.GaussianBlur(5)))
 
     # 2) 홀로 광택: 그림이 뿌옇게 바래지 않도록 그림 위에는 무지개 막을 씌우지 않고,
     #    비스듬한 빛줄기만 약하게 지나가게 한다. 홀로 느낌은 테두리·배지·문장(紋章)이 맡는다.
@@ -290,7 +300,7 @@ def compose_card(
     card = ImageChops.screen(card, _frame(size))
     ui = Image.new("RGBA", size, (0, 0, 0, 0))
 
-    # 5) 아래 패널: 이름, 등급, 속성·대표 능력치, 고유 능력, 성향, 능력치, 럭키 아이템, 메시지
+    # 5) 아래 패널: 이름, 등급, 속성·대표 능력치, 고유 능력, 성향, 럭키 아이템, 2027년 메시지
     panel = (SAFE_X - 14, PANEL_TOP, WIDTH - SAFE_X + 14, PANEL_BOTTOM)
     content = panel[2] - panel[0] - 56
     left = panel[0] + 28
@@ -329,67 +339,46 @@ def compose_card(
     draw.line((left, y, right, y), fill=(*GOLD, 90), width=2)
     y += 16
 
-    # 고유 능력 + 위력
+    # 고유 능력
     badge_font = _font(20, 800)
     badge = (left, y, left + 108, y + 36)
     draw.rounded_rectangle(badge, radius=18, fill=(*GOLD, 255))
     draw.text(((badge[0] + badge[2]) / 2, y + 18), "고유 능력", font=badge_font, fill=SHADOW, anchor="mm")
-    power_font = _font(46, 900)
-    power = str(stats[top_key] + stats["willpower"] // 2)
-    power_width = draw.textlength(power, font=power_font)
     ability_font = _font(32, 800)
     draw.text(
         (badge[2] + 14, y + 18),
-        _fit(draw, character.ability, ability_font, content - (badge[2] - left) - 14 - power_width - 20),
+        _fit(draw, character.ability, ability_font, content - (badge[2] - left) - 14),
         font=ability_font,
         fill=WHITE,
         anchor="lm",
     )
-    draw.text((right, y + 36), power, font=power_font, fill=GOLD, anchor="rs")
     y += 50
     _paragraph(draw, (left, y), character.disposition, _font(23, 500), content, (225, 220, 245), max_lines=2)
     y += 2 * 33 + 10
 
-    # 능력치 6칸
-    gap = 10
-    cell = (content - gap * 5) / 6
-    for index, (key, label) in enumerate(STAT_LABELS.items()):
-        x0 = left + index * (cell + gap)
-        highlight = key == top_key
-        draw.rounded_rectangle(
-            (x0, y, x0 + cell, y + 78),
-            radius=14,
-            fill=(255, 255, 255, 50 if highlight else 22),
-            outline=(*GOLD, 255) if highlight else (255, 255, 255, 60),
-            width=3 if highlight else 2,
-        )
-        draw.text((x0 + cell / 2, y + 10), label, font=_font(19, 700), fill=(210, 205, 235), anchor="ma")
-        draw.text(
-            (x0 + cell / 2, y + 36), str(stats[key]), font=_font(32, 900), fill=GOLD if highlight else WHITE, anchor="ma"
-        )
-    y += 78 + 16
+    # 럭키 아이템 (작게 한 줄)
+    lucky = f"럭키 아이템 · {character.lucky_item}"
+    draw.text((left, y), _fit(draw, lucky, _font(22, 600), content), font=_font(22, 600), fill=(*GOLD, 230))
+    y += 46
+    draw.line((left, y, right, y), fill=(*GOLD, 70), width=2)
+    y += 20
 
-    # 럭키 아이템
-    lucky_label = _font(22, 800)
-    draw.text((left, y), "LUCKY", font=lucky_label, fill=GOLD)
-    offset = draw.textlength("LUCKY", font=lucky_label) + 14
-    draw.text((left + offset, y), _fit(draw, character.lucky_item, _font(23, 600), content - offset), font=_font(23, 600), fill=WHITE)
-    y += 40
-
-    # 2027년 메시지
+    # 2027년 메시지: 카드에서 가장 크게 읽히는 글
+    draw.text((left, y), "2027년의 너에게", font=_font(24, 800), fill=GOLD)
+    y += 42
     _paragraph(
         draw,
         (left, y),
-        f"2027년의 너에게 — {character.message_2027}",
-        _font(22, 500),
+        character.message_2027,
+        _font(29, 500),
         content,
-        (240, 236, 255),
-        max_lines=max(1, (PANEL_BOTTOM - 20 - y) // 31),
+        (244, 240, 230),
+        max_lines=max(1, (PANEL_BOTTOM - 18 - y) // 41),
     )
 
     # 6) 꼬리말: 아래 메달 양옆
     footer_font = _font(20, 800)
-    draw.text((WIDTH * 0.27, FOOTER_Y), "ai-dentity · 이게 나라고?", font=footer_font, fill=GOLD, anchor="mm")
+    draw.text((WIDTH * 0.27, FOOTER_Y), "이게 나라고?", font=footer_font, fill=GOLD, anchor="mm")
     serial = f"No.{card_id[-4:].upper()} · 1/1" if card_id else "1/1"
     draw.text((WIDTH * 0.73, FOOTER_Y), serial, font=footer_font, fill=GOLD, anchor="mm")
 
