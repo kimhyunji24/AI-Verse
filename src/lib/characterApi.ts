@@ -17,6 +17,7 @@
  *   - 2026-11-22 포토카드 요청에 손 모양 추가
  *   - 2026-11-22 캐릭터 유형 '애니메이션 캐릭터'를 '실제 동물'로 교체 (값 anime → animal)
  *   - 2026-11-22 캐릭터 유형 표시 이름을 '실제 동물'에서 '동물 머리'로 변경
+ *   - 2026-11-24 질문·선택지 화면 문구 수정 (내부 값은 그대로)
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -74,10 +75,10 @@ export const QUESTIONS = [
   },
   {
     key: "crisis",
-    title: "위기가 닥치면 어떻게 할까요?",
+    title: "곤란한 일이 생기면 어떻게 할까요?",
     options: [
-      { value: "confront", label: "맞선다" },
-      { value: "hide", label: "숨는다" },
+      { value: "confront", label: "부딪혀 본다" },
+      { value: "hide", label: "잠깐 숨는다" },
       { value: "trick", label: "꾀를 낸다" },
       { value: "call_friends", label: "동료를 부른다" },
     ],

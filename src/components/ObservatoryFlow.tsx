@@ -19,6 +19,8 @@
  *   - 2026-11-22 캐릭터 생성 뒤 포토카드(일러스트 + 합성) 요청, 완성 전에는 카드 완성 버튼을 막음
  *   - 2026-11-22 얼굴 측정 뒤 포즈 잡기 단계 추가, 뼈대 그림을 포토카드 요청에 함께 보냄
  *   - 2026-11-22 포즈 단계에서 손가락과 손 모양을 잡아 뼈대 그림과 포토카드 요청에 반영, 인식한 손 모양 표시
+ *   - 2026-11-24 화면 멘트 정리: 마법 거울 문구를 카메라·솥 문구로, 얼굴 측정 때 사진 미저장 안내, '찰칵' 대신 포즈가 정해진다는 안내
+ *   - 2026-11-24 끓는 중 화면: 얼굴 수치 터미널 대신 솥을 가운데 크게 두고 단계 표시(BrewingProgress), 질문 화면: 솥 작게·질문 크게, 재료 이름을 읽히는 크기로
  */
 
 "use client";
@@ -29,7 +31,7 @@ import CharacterResult from "@/components/CharacterResult";
 import LandmarkOverlay, { type OverlayHandle } from "@/components/LandmarkOverlay";
 import PoseOverlay, { type PoseOverlayHandle } from "@/components/PoseOverlay";
 import SurveyStep from "@/components/SurveyStep";
-import TerminalLoading from "@/components/TerminalLoading";
+import BrewingProgress from "@/components/BrewingProgress";
 import WebcamView from "@/components/WebcamView";
 import { useArcadeButton } from "@/hooks/useArcadeButton";
 import { useFaceLandmarker } from "@/hooks/useFaceLandmarker";
@@ -95,11 +97,11 @@ const PRINT_MS = 1800;
 const INGREDIENT_GAP_MS = 450;
 
 const ALIGNMENT_MESSAGES: Record<Alignment, string> = {
-  no_face: "마법 거울 안으로 얼굴을 비춰 주세요",
-  multiple_faces: "한 분만 거울 앞에 서 주세요",
+  no_face: "카메라에 얼굴이 보이게 앉아 주세요",
+  multiple_faces: "한 분만 카메라 앞에 앉아 주세요",
   too_far: "조금 더 가까이 와 주세요",
   too_close: "조금 뒤로 물러나 주세요",
-  off_center: "얼굴을 거울 가운데로 옮겨 주세요",
+  off_center: "얼굴을 화면 가운데로 옮겨 주세요",
   turned: "정면을 바라봐 주세요",
   ready: "준비 완료! 버튼을 눌러 시작하세요",
 };
@@ -419,10 +421,10 @@ export default function ObservatoryFlow() {
       </div>
 
       {showCamera && landmarkerStatus === "loading" && (
-        <p>마법 거울을 깨우고 있어요</p>
+        <p>솥에 불을 붙이는 중이에요</p>
       )}
       {showCamera && landmarkerStatus === "error" && (
-        <p>마법 거울을 불러오지 못했어요. 인터넷 연결을 확인한 뒤 새로고침해 주세요</p>
+        <p>솥에 불을 붙이지 못했어요. 인터넷 연결을 확인한 뒤 새로고침해 주세요</p>
       )}
       {landmarkerStatus === "ready" && step === "align" && (
         <div className="flex flex-col items-center gap-3" role="status">
@@ -437,7 +439,7 @@ export default function ObservatoryFlow() {
           </button>
         </div>
       )}
-      {step === "scan" && <p role="status">얼굴을 묘약 재료로 바꾸고 있어요</p>}
+      {step === "scan" && <p role="status">잠깐 그대로! 얼굴 모양을 살펴보고 있어요 · 사진은 저장하지 않아요</p>}
       {step === "pose" && (
         <div className="flex flex-col items-center gap-1 text-center" role="status">
           <p className="font-display text-2xl text-emerald-200">
@@ -446,7 +448,7 @@ export default function ObservatoryFlow() {
           <p>
             {poseAttempt > 0
               ? "어깨와 팔이 화면에 보이게 조금 뒤로 앉아 주세요"
-              : "손과 팔을 자유롭게 움직여 보세요. 숫자가 끝나면 찰칵!"}
+              : "손과 팔을 자유롭게 움직여 보세요. 숫자가 0이 되면 포즈가 정해져요"}
           </p>
           {gestureText && (
             <p className="text-sm text-amber-200">인식한 손 모양: {gestureText}</p>
@@ -455,20 +457,31 @@ export default function ObservatoryFlow() {
       )}
 
       {showCauldron && (
-        <div className="grid w-full items-center gap-6 md:grid-cols-2">
-          <div>
+        <div
+          className={
+            step === "brewing"
+              ? "flex w-full flex-col items-center gap-6"
+              : "grid w-full items-center gap-8 md:grid-cols-[2fr_3fr]"
+          }
+        >
+          <div className={step === "brewing" ? "w-full max-w-md" : undefined}>
             <Cauldron mood={mood} ingredients={ingredients} />
-            <ul
-              data-testid="ingredients"
-              className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-purple-200/80"
-            >
-              {ingredients.map((item) => (
-                <li key={item.key} className="flex items-center gap-1">
-                  <item.Icon className="text-base" style={{ color: item.color }} aria-hidden />
-                  {item.label}
-                </li>
-              ))}
-            </ul>
+            {step !== "brewing" && (
+              <ul
+                data-testid="ingredients"
+                className="mt-3 flex flex-wrap justify-center gap-2 text-sm"
+              >
+                {ingredients.map((item) => (
+                  <li
+                    key={item.key}
+                    className="flex items-center gap-1.5 rounded-full bg-amber-200/10 px-3 py-1 text-amber-100"
+                  >
+                    <item.Icon className="text-base" style={{ color: item.color }} aria-hidden />
+                    {item.label}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="flex flex-col items-center gap-4">
@@ -511,14 +524,7 @@ export default function ObservatoryFlow() {
               </div>
             )}
 
-            {step === "brewing" && features && (
-              <div className="flex w-full flex-col gap-3">
-                <h2 className="font-display text-center text-2xl text-purple-200">
-                  부글부글 끓는 중…
-                </h2>
-                <TerminalLoading features={features} />
-              </div>
-            )}
+            {step === "brewing" && <BrewingProgress ingredients={ingredients} />}
 
             {step === "failed" && failure && (
               <div className="flex flex-col items-center gap-3" role="alert">
@@ -568,7 +574,7 @@ export default function ObservatoryFlow() {
             printing={step === "printing"}
           />
           {step === "card" && drawing && (
-            <p role="status">일러스트를 그리고 있어요. 잠시만 기다려 주세요</p>
+            <p role="status">솥에서 모습이 떠오르고 있어요. 조금만 기다려 주세요</p>
           )}
           {step === "card" && cardFailure && (
             <div className="flex flex-col items-center gap-3" role="alert">
@@ -589,7 +595,7 @@ export default function ObservatoryFlow() {
           )}
           {step === "card" && photocard && (
             <button type="button" onClick={pressCard} className={primaryButton}>
-              버튼을 눌러 카드 완성하기
+              버튼을 누르면 카드가 완성돼요
             </button>
           )}
         </>
