@@ -12,8 +12,10 @@
  *   - 2026-11-03 GPT의 선택 이유(묘약 기록) 표시 추가
  *   - 2026-11-22 완성된 포토카드 이미지 표시와 일러스트 생성 중 문구 추가
  *   - 2026-11-24 그림을 기다리는 동안 카드는 이름·종족·고유 능력·성향만 크게 보여주도록 단순화 (나머지는 완성 카드에)
+ *   - 2026-11-24 완성 카드가 뒷면 → 빛 리본 → 뒤집기 연출(CardReveal)로 나오도록 변경
  */
 
+import CardReveal from "@/components/CardReveal";
 import {
   assetUrl,
   type Character,
@@ -35,14 +37,17 @@ export default function CharacterResult({
 
   if (photocard) {
     return (
-      // 백엔드가 만든 파일을 그대로 보여준다. 크기가 고정이라 next/image 최적화가 필요 없다.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        data-testid="photocard"
-        src={assetUrl(photocard.card_url)}
-        alt={`${character.name} 포토카드`}
-        className={`aspect-[100/148] w-[min(92vw,26rem)] rounded-2xl shadow-[0_0_60px_rgba(168,85,247,0.45)] ${animation}`}
-      />
+      // 완성 카드는 뒷면 → 빛 리본 → 뒤집기 연출(CardReveal) 뒤에 나온다. 출력할 때는 카드째 아래로 내려간다.
+      <CardReveal className={printing ? "anim-card-print" : ""}>
+        {/* 백엔드가 만든 파일을 그대로 보여준다. 크기가 고정이라 next/image 최적화가 필요 없다. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          data-testid="photocard"
+          src={assetUrl(photocard.card_url)}
+          alt={`${character.name} 포토카드`}
+          className="rounded-2xl shadow-[0_0_60px_rgba(168,85,247,0.45)]"
+        />
+      </CardReveal>
     );
   }
 
