@@ -24,6 +24,7 @@
  *   - 2026-11-24 "카드 준비 중" 화면 없앰: 그림까지 솥에서 끓인 뒤, 솥이 번쩍하며 카드 등장 연출(CardReveal)이 바로 시작되게 함 (펑 문구 제거)
  *   - 2026-11-24 솥에서 나온 카드는 뒷면으로 기다리다 누르면 앞면이 보이고, 그 뒤 "내 카드 인쇄하기"로 실제 인쇄(100×148mm)
  *   - 2026-11-24 얼굴 세부 수치 14개로 동물상 유사도를 계산해 상위 3개를 재료로 넣고, 질문 화면에 AI 얼굴 분석 패널 표시
+ *   - 2026-11-24 얼굴 측정 뒤 정밀 분석 화면(analysis) 추가: 홍채 지름 기준 mm 실측, 측정선이 그려진 사진, 얼굴형·대칭·비율표
  */
 
 "use client";
@@ -34,6 +35,7 @@ import { createPortal } from "react-dom";
 
 import CharacterResult from "@/components/CharacterResult";
 import FaceLookPanel from "@/components/FaceLookPanel";
+import FaceScanReport from "@/components/FaceScanReport";
 import LandmarkOverlay, { type OverlayHandle } from "@/components/LandmarkOverlay";
 import PoseOverlay, { type PoseOverlayHandle } from "@/components/PoseOverlay";
 import SurveyStep from "@/components/SurveyStep";
@@ -58,8 +60,10 @@ import {
   checkAlignment,
   extractFeatures,
   type FaceFeatures,
+  type Landmark,
 } from "@/lib/faceFeatures";
 import { analyzeFaceLook, averageDetail, type FaceDetail, type FaceLook, measureFace } from "@/lib/faceLook";
+import { averageMeasure, type FaceMeasure, measureMillimeters } from "@/lib/faceMeasure";
 import {
   ANSWER_INGREDIENTS,
   faceLookIngredients,
@@ -80,6 +84,7 @@ type Step =
   | "align"
   | "countdown"
   | "scan"
+  | "analysis"
   | "pose"
   | "survey"
   | "spell"
@@ -116,6 +121,15 @@ const ALIGNMENT_MESSAGES: Record<Alignment, string> = {
 const primaryButton =
   "rounded-full bg-emerald-300 px-6 py-2 font-medium text-black disabled:opacity-40";
 
+/** 지금 영상 한 장을 화면 안에서만 쓸 사진(dataURL)으로 뜬다. 서버로 보내거나 저장하지 않는다. */
+function captureFrame(video: HTMLVideoElement) {
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d")?.drawImage(video, 0, 0);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 export default function ObservatoryFlow() {
   const webcam = useWebcam();
   const { start: startWebcam } = webcam;
@@ -127,6 +141,8 @@ export default function ObservatoryFlow() {
   const samplesRef = useRef<FaceFeatures[]>([]);
   // 동물상 분석용 세부 수치 (화면 연출용, 백엔드로 보내지 않는다)
   const detailSamplesRef = useRef<FaceDetail[]>([]);
+  // mm 실측값 (홍채 지름 기준)
+  const measureSamplesRef = useRef<FaceMeasure[]>([]);
   const scanStartRef = useRef(0);
   const holdFrameRef = useRef(0);
   // 화면이 다음 단계로 바뀌기 전에 프레임이 더 들어와도 측정 완료를 한 번만 처리한다
@@ -141,6 +157,8 @@ export default function ObservatoryFlow() {
   const [hold, setHold] = useState(0);
   const [features, setFeatures] = useState<FaceFeatures | null>(null);
   const [faceLook, setFaceLook] = useState<FaceLook | null>(null);
+  // 정밀 분석 화면에 쓰는 마지막 순간 사진(브라우저 안에서만)과 그때의 얼굴 점, 실측 평균
+  const [faceScan, setFaceScan] = useState<{ snapshot: string; landmarks: Landmark[]; measure: FaceMeasure } | null>(null);
   const [answers, setAnswers] = useState<Answers | null>(null);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [character, setCharacter] = useState<Character | null>(null);
@@ -177,6 +195,7 @@ export default function ObservatoryFlow() {
       if (current !== "ready") {
         samplesRef.current = [];
         detailSamplesRef.current = [];
+        measureSamplesRef.current = [];
         setProgress(0);
         setStep("align");
         return;
@@ -185,22 +204,33 @@ export default function ObservatoryFlow() {
       if (samplesRef.current.length === 0) scanStartRef.current = now;
       samplesRef.current.push(extractFeatures(faces[0], aspect));
       detailSamplesRef.current.push(measureFace(faces[0], aspect));
+      measureSamplesRef.current.push(measureMillimeters(faces[0], aspect));
       const elapsed = now - scanStartRef.current;
       setProgress(Math.min(elapsed / SCAN_MS, 1));
       if (elapsed >= SCAN_MS && samplesRef.current.length >= SCAN_MIN_SAMPLES) {
         scanFinishedRef.current = true;
         setFeatures(averageFeatures(samplesRef.current));
         setFaceLook(analyzeFaceLook(averageDetail(detailSamplesRef.current)));
-        latestPoseRef.current = null;
-        setPoseCount(POSE_SECONDS);
-        setPoseAttempt(0);
-        setStep("pose");
+        setFaceScan({
+          snapshot: captureFrame(video),
+          landmarks: faces[0].map((point) => ({ ...point })),
+          measure: averageMeasure(measureSamplesRef.current),
+        });
+        setStep("analysis");
       }
     },
     [step],
   );
 
   const landmarkerStatus = useFaceLandmarker(webcam.videoRef, handleFrame);
+
+  // 정밀 분석 화면을 본 뒤 포즈 잡기로 넘어간다
+  const startPose = useCallback(() => {
+    latestPoseRef.current = null;
+    setPoseCount(POSE_SECONDS);
+    setPoseAttempt(0);
+    setStep("pose");
+  }, []);
 
   const handlePose = useCallback(
     (pose: PoseLandmark[] | undefined, hands: Hand[], video: HTMLVideoElement) => {
@@ -237,6 +267,7 @@ export default function ObservatoryFlow() {
     if (step !== "align" || alignment !== "ready") return;
     samplesRef.current = [];
     detailSamplesRef.current = [];
+    measureSamplesRef.current = [];
     scanFinishedRef.current = false;
     setProgress(0);
     setCount(COUNTDOWN_SECONDS);
@@ -299,8 +330,10 @@ export default function ObservatoryFlow() {
   const restart = useCallback(() => {
     samplesRef.current = [];
     detailSamplesRef.current = [];
+    measureSamplesRef.current = [];
     setFeatures(null);
     setFaceLook(null);
+    setFaceScan(null);
     setAnswers(null);
     setIngredients([]);
     setCharacter(null);
@@ -355,6 +388,7 @@ export default function ObservatoryFlow() {
   useArcadeButton({
     onPress: () => {
       if (step === "align") begin();
+      else if (step === "analysis") startPose();
       else if (step === "spell") startHold();
       else if (step === "card") pressCard();
       else if (step === "failed") {
@@ -454,6 +488,26 @@ export default function ObservatoryFlow() {
           )}
         </WebcamView>
       </div>
+
+      {step === "analysis" && faceScan && faceLook && (
+        <div className="flex w-full max-w-6xl flex-col items-center gap-5">
+          <FaceScanReport
+            snapshot={faceScan.snapshot}
+            landmarks={faceScan.landmarks}
+            measure={faceScan.measure}
+            look={faceLook}
+          />
+          <p className="text-sm text-purple-200/80">사진은 이 화면에서만 쓰고 저장하지 않아요</p>
+          <button
+            type="button"
+            onClick={startPose}
+            className={`anim-card-appear ${primaryButton}`}
+            style={{ animationDelay: "2.8s" }}
+          >
+            다음: 포즈 잡기
+          </button>
+        </div>
+      )}
 
       {showCamera && landmarkerStatus === "loading" && (
         <p>솥에 불을 붙이는 중이에요</p>
