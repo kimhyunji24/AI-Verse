@@ -4,8 +4,7 @@
 역할: 캐릭터 정보와 일러스트를 100×148mm(300dpi) 세로 풀아트 홀로그램 카드 PNG 한 장으로 합성한다.
 비고: SELPHY CP1500 엽서 크기(100×148mm)에 맞췄다. 인쇄는 아직 연결하지 않았고 파일로만 저장한다.
       템플릿 구성: 일러스트는 정보 패널 위 영역(ART_BOX)을 채우고 패널 뒤는 같은 그림을 흐리게 깔아 풀아트처럼 보이게 하며, 무지개 홀로 포일 테두리와 광택·반짝이를 겹친 뒤,
-      위쪽에 등급·이름·속성·대표 능력치, 아래쪽 유리 패널에 고유 능력·2027년 메시지·카드 번호를 얹는다.
-      그림은 가로폭에 맞춰 비율 그대로 위에 놓아 좌우가 잘리지 않게 한다.
+      위쪽에 이름·종족·대표 능력치, 아래쪽 유리 패널에 고유 능력·능력치·럭키 아이템·2027년 메시지·등급·카드 번호를 얹는다.
       반짝이 위치는 카드 번호로 정해서 카드마다 다르게 나온다. 같은 번호면 늘 같은 카드가 나온다.
       한글 글꼴은 CARD_FONT 환경변수로 바꿀 수 있다. 지정하지 않으면 macOS 기본 글꼴을 찾아 쓴다.
 
@@ -15,15 +14,8 @@
   - 2026-11-22 풀아트 홀로그램 템플릿으로 변경 (전면 일러스트, 홀로 포일 테두리, 반짝이, 유리 패널, 1/1 표기)
   - 2026-11-22 일러스트를 정보 패널 위 영역에만 배치해 캐릭터가 패널에 가려지지 않게 변경, 패널 뒤는 흐린 그림으로 채움
   - 2026-11-22 그림이 뿌옇게 보이던 문제 수정: 그림 전체 무지개 막을 없애고 광택은 가늘고 약하게, 반짝이는 가장자리에만 적게
-  - 2026-11-22 카드 번호를 카드 ID의 끝 4자리로 변경 (ID가 생성 시각으로 시작하게 바뀜)
-  - 2026-11-22 긴 이름('~한 + 종족')은 말줄임 대신 글자 크기를 줄여 넣고, 이름에 종족이 있으면 아래 줄에서 종족을 뺌
-  - 2026-11-22 타로풍 천체 프레임 이미지(CARD_FRAME)를 얹고, 이름·정보를 프레임 안쪽 아래 패널로 옮김 (무지개 테두리 대체)
-  - 2026-11-22 투명 배경 일러스트가 검게 나오던 문제 수정 (밝은 바탕에 얹은 뒤 합성)
-  - 2026-11-24 캐릭터가 잘리지 않게 그림 전체를 프레임 안쪽 안전 영역에 비율 그대로 배치 (잘라서 채우지 않음)
-  - 2026-11-24 정보 패널 정리: 능력치 6칸과 설명 없는 위력 숫자 제거, 2027년 메시지를 크게, 꼬리말 단순화
-  - 2026-11-24 패널을 더 덜어냄: 성향·럭키 아이템 줄을 빼고 패널을 낮춰 그림과 패널 사이에 여유를 둠
-  - 2026-11-24 팀 피드백으로 무지개 홀로 풀아트 템플릿으로 되돌림 (천체 프레임 제거). 패널은 고유 능력·2027년 메시지·꼬리말만 남기고,
-               그림은 가로폭에 맞춰 비율 그대로 배치해 좌우가 잘리지 않게 함
+  - 2026-11-24 팀 결정으로 천체 프레임 템플릿을 걷어내고 이 무지개 홀로 풀아트 템플릿으로 되돌림.
+               투명 배경 일러스트가 검게 나오던 문제 수정, 카드 번호를 카드 ID 끝 4자리로, 이름에 종족이 있으면 아랫줄은 속성만 쓰는 것만 유지
 """
 
 import colorsys
@@ -44,7 +36,9 @@ FRAME = 30  # 홀로 포일 테두리 두께
 RADIUS = 56
 PAD = 72  # 카드 가장자리에서 글자까지
 # 정보 패널이 시작하는 높이. 일러스트는 이 위에만 선명하게 배치해 캐릭터가 패널에 가려지지 않게 한다.
-PANEL_TOP = HEIGHT - FRAME - 380
+PANEL_TOP = HEIGHT - FRAME - 566
+# 선명한 일러스트가 끝나는 높이 (패널 모서리 아래로 살짝 들어가 경계가 자연스럽게 보이게 한다)
+ART_BOTTOM = PANEL_TOP + 40
 # 그림 위를 지나가는 빛줄기 세기 (0~1). 높이면 홀로 느낌이 세지지만 그림이 바랜다.
 GLOSS_STRENGTH = 0.3
 CONTENT = WIDTH - PAD * 2
@@ -267,14 +261,11 @@ def compose_card(
     rarity_name, rarity_color = RARITIES[stars]
 
     # 1) 일러스트: 패널 뒤까지 흐린 그림을 깔고, 패널 위 영역에만 선명한 그림을 얹는다
-    #    가로폭에 맞춰 비율 그대로 늘려 위에 붙인다 (좌우를 잘라내지 않는다).
-    #    그림이 패널보다 길면 패널 위까지만 보이고, 아래 끝은 흐린 배경으로 자연스럽게 녹인다.
     art = _flatten(Image.open(io.BytesIO(illustration_png)))
     card = _cover(art, size).filter(ImageFilter.GaussianBlur(28))
     card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.35)
-    art_height = min(round(art.height * WIDTH / art.width), PANEL_TOP + 40)
-    sharp = _cover(art, (WIDTH, art_height))
-    fade = _vertical_fade((WIDTH, art_height), [(0, 255), (max(0.0, 1 - 90 / art_height), 255), (1, 0)])
+    sharp = _cover(art, (WIDTH, ART_BOTTOM))
+    fade = _vertical_fade((WIDTH, ART_BOTTOM), [(0, 255), ((PANEL_TOP - 30) / ART_BOTTOM, 255), (1, 0)])
     card.paste(sharp, (0, 0), fade)
 
     # 2) 홀로 광택: 그림이 뿌옇게 바래지 않도록 그림 위에는 무지개 막을 씌우지 않고,
@@ -365,16 +356,17 @@ def compose_card(
 
     name_font = _font(80, 900)
     name_room = label_right - draw.textlength(STAT_LABELS[top_key], font=label_font) - PAD - 24
-    name_size = 80
-    while name_size > 52 and draw.textlength(character.name, font=_font(name_size, 900)) > name_room:
-        name_size -= 4
-    name_font = _font(name_size, 900)
     _outlined(draw, (PAD, y + 120), _fit(draw, character.name, name_font, name_room), name_font, stroke=6, anchor="ls")
-    subtitle = f"{character.element} 속성" if character.race in character.name else f"{character.race} · {character.element} 속성"
     _outlined(
         draw,
         (PAD, y + 140),
-        _fit(draw, subtitle, _font(30, 700), CONTENT),
+        # 이름에 이미 종족이 들어 있으면('~한 토끼') 아랫줄에는 속성만 쓴다
+        _fit(
+            draw,
+            f"{character.element} 속성" if character.race in character.name else f"{character.race} · {character.element} 속성",
+            _font(30, 700),
+            CONTENT,
+        ),
         _font(30, 700),
         (235, 230, 255),
         stroke=3,
@@ -389,8 +381,8 @@ def compose_card(
     ui.alpha_composite(glass)
     draw = ImageDraw.Draw(ui)
 
-    # 고유 능력: 홀로 배지 + 능력 이름
-    y = panel_top + 34
+    # 고유 능력: 홀로 배지 + 능력 이름 + 위력
+    y = panel_top + 30
     badge_font = _font(24, 800)
     badge = (PAD, y, PAD + 132, y + 44)
     badge_mask = Image.new("L", size, 0)
@@ -398,39 +390,71 @@ def compose_card(
     ui.paste(_rainbow(size, angle_turns=4, offset=0.55).convert("RGBA"), (0, 0), badge_mask)
     draw = ImageDraw.Draw(ui)
     draw.text(((badge[0] + badge[2]) / 2, y + 22), "고유 능력", font=badge_font, fill=SHADOW, anchor="mm")
+
+    power_font = _font(64, 900)
+    power = str(stats[top_key] + stats["willpower"] // 2)
+    power_width = draw.textlength(power, font=power_font)
     ability_font = _font(40, 800)
     draw.text(
         (badge[2] + 18, y + 22),
-        _fit(draw, character.ability, ability_font, CONTENT - (badge[2] - PAD) - 18),
+        _fit(draw, character.ability, ability_font, CONTENT - (badge[2] - PAD) - 18 - power_width - 24),
         font=ability_font,
         fill=WHITE,
         anchor="lm",
     )
-    y += 44 + 28
-    draw.line((PAD, y, WIDTH - PAD, y), fill=(255, 255, 255, 60), width=2)
-    y += 26
+    draw.text((WIDTH - PAD, y + 48), power, font=power_font, fill=GOLD, anchor="rs")
+    y += 70
+    _paragraph(draw, (PAD, y), character.disposition, _font(28, 500), CONTENT, (225, 220, 245), max_lines=2)
+    y += 2 * 40 + 18
+
+    # 능력치: 유리 칸 6개
+    gap = 12
+    cell = (CONTENT - gap * 5) / 6
+    for index, (key, label) in enumerate(STAT_LABELS.items()):
+        x0 = PAD + index * (cell + gap)
+        highlight = key == top_key
+        draw.rounded_rectangle(
+            (x0, y, x0 + cell, y + 96),
+            radius=16,
+            fill=(255, 255, 255, 60 if highlight else 28),
+            outline=(*GOLD, 255) if highlight else (255, 255, 255, 70),
+            width=3 if highlight else 2,
+        )
+        draw.text((x0 + cell / 2, y + 14), label, font=_font(22, 700), fill=(210, 205, 235), anchor="ma")
+        draw.text(
+            (x0 + cell / 2, y + 44), str(stats[key]), font=_font(38, 900), fill=GOLD if highlight else WHITE, anchor="ma"
+        )
+    y += 96 + 22
+
+    # 럭키 아이템
+    lucky_label = _font(26, 800)
+    draw.text((PAD, y), "LUCKY", font=lucky_label, fill=GOLD)
+    offset = draw.textlength("LUCKY", font=lucky_label) + 18
+    draw.text(
+        (PAD + offset, y), _fit(draw, character.lucky_item, _font(28, 600), CONTENT - offset), font=_font(28, 600), fill=WHITE
+    )
+    y += 52
 
     # 2027년 메시지: 왼쪽에 홀로 막대
-    draw.text((PAD + 22, y), "2027년의 너에게", font=_font(26, 800), fill=GOLD)
-    y += 46
     message_end = _paragraph(
         draw,
         (PAD + 22, y),
-        character.message_2027,
-        _font(30, 500),
+        f"2027년의 너에게 — {character.message_2027}",
+        _font(26, 500),
         CONTENT - 22,
         (240, 236, 255),
         max_lines=3,
     )
     bar = Image.new("L", size, 0)
-    ImageDraw.Draw(bar).rounded_rectangle((PAD, y - 44, PAD + 6, message_end - 10), radius=3, fill=255)
+    ImageDraw.Draw(bar).rounded_rectangle((PAD, y + 2, PAD + 6, message_end - 10), radius=3, fill=255)
     ui.paste(_rainbow(size, angle_turns=6).convert("RGBA"), (0, 0), bar)
     draw = ImageDraw.Draw(ui)
 
-    # 꼬리말: 부스 이름 / 카드 번호 · 1/1
+    # 꼬리말: 팀 이름 / 부스 이름 / 카드 번호 · 1/1
     footer_y = panel[3] - 34
     footer_font = _font(22, 800)
-    draw.text((PAD, footer_y), "이게 나라고?", font=footer_font, fill=(210, 205, 235), anchor="lm")
+    draw.text((PAD, footer_y), "ai-dentity", font=footer_font, fill=(210, 205, 235), anchor="lm")
+    draw.text((WIDTH / 2, footer_y), "이게 나라고?", font=footer_font, fill=(210, 205, 235), anchor="mm")
     serial = f"No.{card_id[-4:].upper()} · 1/1" if card_id else "1/1"
     draw.text((WIDTH - PAD, footer_y), serial, font=footer_font, fill=GOLD, anchor="rm")
 
