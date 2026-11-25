@@ -20,6 +20,7 @@
   - 2026-11-22 90년대 사진관 프로필 사진 스타일로 변경: 머리만 바뀐 사람 몸, 의상 템플릿, 우주·무지개 레이저 배경 고정, 근엄한 표정
   - 2026-11-22 동물 캐릭터는 고정 프롬프트(2등신 찹쌀떡 몸, 손그림 갈색 선, 파스텔)로 그리고 격한 감정과
               설문 장소에 맞춘 단순한 배경을 넣도록 변경. 사물 머리 캐릭터는 사진관 스타일 그대로.
+  - 2026-11-26 동물 캐릭터가 손 모양(브이 등)을 무시하고 주먹으로 그려지던 문제: 손 모양을 영어로 최우선 지시
 """
 
 import base64
@@ -99,6 +100,27 @@ GESTURE_TEXT = {
 }
 SIDE_TEXT = {"left": "그림의 왼쪽 손", "right": "그림의 오른쪽 손"}
 
+# 동물 캐릭터용 영어 문장. 동물 화풍은 "손가락 없는 뭉툭한 손"이 기본이라, 손 모양은 영어로 따로 세게 지시해야 그려진다.
+GESTURE_TEXT_EN = {
+    "Closed_Fist": "a closed fist",
+    "Open_Palm": "an open palm with all five fingers spread wide",
+    "Pointing_Up": "only the index finger raised, pointing up",
+    "Thumb_Down": "a thumbs-down (only the thumb out, pointing down)",
+    "Thumb_Up": "a thumbs-up (only the thumb raised)",
+    "Victory": "a V sign / peace sign: index and middle fingers raised and spread apart in a clear V, other fingers folded",
+    "ILoveYou": "the 'I love you' sign: thumb, index finger and pinky raised, middle and ring fingers folded",
+}
+SIDE_TEXT_EN = {"left": "the paw on the LEFT side of the image", "right": "the paw on the RIGHT side of the image"}
+
+
+def gesture_line_en(hand_gestures: list[HandGesture]) -> str:
+    parts = [f"{SIDE_TEXT_EN[hand.side]} makes {GESTURE_TEXT_EN[hand.gesture]}" for hand in hand_gestures]
+    return (
+        f"HAND SIGN (top priority, must be clearly readable at a glance): {'; '.join(parts)}. "
+        "For this hand sign, give the paw small but distinct fingers with the correct finger count, "
+        "raise the paw beside the face so it is not hidden, and do NOT draw a fist or a mitten paw instead."
+    )
+
 
 def gesture_line(hand_gestures: list[HandGesture]) -> str:
     parts = [f"{SIDE_TEXT[hand.side]}은 {GESTURE_TEXT[hand.gesture]}" for hand in hand_gestures]
@@ -160,7 +182,7 @@ def _animal_prompt(
                 else ["Expression: MAXIMUM EMOTION, pick one strong feeling and exaggerate it as much as possible."]
             ),
             *([f"Pose (Korean): {POSE_INSTRUCTIONS}"] if with_pose else []),
-            *([f"Hands (Korean): {gesture_line(hand_gestures)} Keep the stubby hands simple but readable."] if hand_gestures else []),
+            *([gesture_line_en(hand_gestures), f"Hands (Korean): {gesture_line(hand_gestures)}"] if hand_gestures else []),
             f"Background: {background}, hand-drawn picture-book style. Keep it soft and secondary to the character.",
             "Composition: one character only, full body, centered and large, ears, tail and feet not cut off, "
             "about 15% empty space above the head.",
