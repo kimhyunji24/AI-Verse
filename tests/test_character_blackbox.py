@@ -82,10 +82,11 @@ FEATURE_BOUNDS = {
 SHAPE_FEATURES = [name for name in FEATURES if not name.startswith("head_")]
 
 
-def body(features=None, answers=None):
+def body(features=None, answers=None, animal_looks=None):
     return {
         "features": {**FEATURES, **(features or {})},
         "answers": {**ANSWERS, **(answers or {})},
+        **({"animal_looks": animal_looks} if animal_looks is not None else {}),
     }
 
 
@@ -411,17 +412,38 @@ def test_animal_gets_face_traits_nonhuman_does_not(client, openai_server):
     assert "art_style" not in animal and "art_features" not in animal
 
 
-def test_animal_race_candidates_are_random_real_animals(client, openai_server):
-    draws = [
-        tuple(create(client, answers={"character_type": "animal"})["parameters"]["race_candidates"])
-        for _ in range(6)
-    ]
-    for races in draws:
-        assert len(races) == 3 and len(set(races)) == 3
-        for race in races:
-            assert 1 <= len(race) <= 5 and " " not in race and "머리" not in race, race
-    # 응답이나 얼굴로 정하지 않고 매번 무작위로 뽑는다
-    assert len(set(draws)) > 1
+def test_animal_race_comes_from_the_closest_animal_look(client, openai_server):
+    looks = [{"key": "fox", "percent": 41}, {"key": "cat", "percent": 22}]
+    for _ in range(6):
+        result = create(client, answers={"character_type": "animal"}, animal_looks=looks)
+        assert result["parameters"]["race_candidates"] in (["여우"], ["사막여우"], ["레서판다"], ["고슴도치"])
+        # 모델이 다른 동물을 골라도 룰이 고른 동물로 되돌린다
+        assert result["race"] == result["parameters"]["race_candidates"][0]
+        assert result["parameters"]["animal_look"] == "여우상"
+        assert "여우상의 기운이 41%로 가장 짙어" in result["reason"]
+
+
+def test_animal_without_looks_still_gets_one_real_animal(client, openai_server):
+    races = create(client, answers={"character_type": "animal"})["parameters"]["race_candidates"]
+    assert len(races) == 1 and " " not in races[0] and "머리" not in races[0]
+
+
+def test_invalid_animal_look_is_rejected(client, openai_server):
+    response = client.post("/api/character", json=body(animal_looks=[{"key": "dragon", "percent": 50}]))
+    assert response.status_code == 422
+
+
+def test_ability_and_reason_follow_the_most_distinctive_face_trait(client, openai_server):
+    # 턱 폭 점수만 크게 벗어나게 하면 턱선이 가장 두드러진 특징이 된다
+    from app.services.parameters import SCORE_RANGES
+
+    neutral = {name: (low + high) / 2 for name, (low, high) in SCORE_RANGES.items()}
+    wide_jaw = create(client, features={**neutral, "jaw_width_ratio": 1.2}, answers={"power": "fly"})
+    assert wide_jaw["ability"] == "묵직한 바람 타기"
+    assert wide_jaw["reason"].startswith("넓은 턱선이 '묵직한' 힘으로 끓어올랐고")
+    narrow_jaw = create(client, features={**neutral, "jaw_width_ratio": 0.5}, answers={"power": "stop_time"})
+    assert narrow_jaw["ability"] == "날렵한 시간 멈춤"
+    assert narrow_jaw["reason"].startswith("갸름한 턱선이 '날렵한' 힘으로")
 
 
 def test_name_is_assembled_from_a_hint_and_the_race(client, openai_server):

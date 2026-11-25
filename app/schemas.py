@@ -60,9 +60,20 @@ class Answers(BaseModel):
     bag: Literal["snack", "book", "map", "charm"]
 
 
+# 프론트가 얼굴 랜드마크로 계산한 동물상 (faceLook.ts 의 ANIMALS key와 같다)
+AnimalLookKey = Literal["fox", "cat", "dog", "rabbit", "bear", "monkey", "deer", "dino", "wolf", "hamster"]
+
+
+class AnimalLook(BaseModel):
+    key: AnimalLookKey
+    percent: int = Field(ge=0, le=100)
+
+
 class CharacterRequest(BaseModel):
     features: FaceFeatures
     answers: Answers
+    # 닮은 동물상 상위 몇 개. 동물 캐릭터의 종족을 고르는 데 쓴다. 없으면 동물 풀 전체에서 고른다.
+    animal_looks: list[AnimalLook] = Field(default=[], max_length=10)
 
 
 class Stats(BaseModel):
@@ -109,6 +120,11 @@ class CharacterParameters(BaseModel):
     face_traits: list[str] = []
     # 동물 캐릭터만: 무작위로 고른 격한 감정 (예: 감격해서 눈물 글썽). 인외 캐릭터는 비어 있다.
     emotion: str = ""
+    # 얼굴에서 가장 두드러진 특징 (예: 멀리 떨어진 두 눈). 고유 능력과 선택 이유에 쓴다.
+    signature_trait: str = ""
+    # 동물 캐릭터만: 가장 닮은 동물상과 비율 (예: 여우상, 41)
+    animal_look: str = ""
+    animal_look_percent: int = 0
 
 
 class StatNames(BaseModel):
@@ -131,9 +147,6 @@ class AiDecision(BaseModel):
     stats: Stats
     # 능력치 이름 (캐릭터마다 다름)
     stat_names: StatNames
-    # 고유 능력 이름. 룰이 정한 힘의 방향(parameters.ability)을 바탕으로 GPT가 짓는다.
-    ability: str
-    reason: str
     name: str
     appearance: str
     backstory: str
@@ -143,6 +156,9 @@ class AiDecision(BaseModel):
 
 class CharacterResponse(AiDecision):
     palette: str
+    # 고유 능력과 선택 이유는 얼굴 패턴 표로 룰이 정한다 (parameters.py)
+    ability: str
+    reason: str
     # 예전 카드 요청에는 없을 수 있다. 없으면 기본 이름(통찰·생명력…)을 쓴다.
     stat_names: StatNames | None = None
     # 어떤 파라미터로 만들어졌는지 체험 화면에 보여주기 위해 함께 반환한다

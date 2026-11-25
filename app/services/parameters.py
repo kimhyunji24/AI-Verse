@@ -24,11 +24,14 @@
   - 2026-11-22 이름 낱말을 '~한'으로 끝나는 완성형 수식어로 변경 (이름이 '~한 + 종족' 형식이 됨)
   - 2026-11-22 의상 템플릿 6종(OUTFITS) 추가, 참가자마다 무작위로 하나, 실제 동물을 '동물 머리 + 사람 몸'으로 변경
   - 2026-11-22 동물 캐릭터를 2등신 찹쌀떡 몸의 손그림 캐릭터로 변경, 격한 감정(EMOTIONS)을 무작위로 하나 추가
+  - 2026-11-26 얼굴 패턴으로 정확히 고르기: 동물 종족은 가장 닮은 동물상(ANIMAL_LOOK_POOLS)에서,
+               고유 능력은 가장 두드러진 얼굴 특징(ABILITY_FLAVORS) × 갖고 싶은 힘(ABILITY_CORES)으로,
+               선택 이유는 같은 특징과 동물상·실루엣을 넣은 문장 틀(build_reason)로 만든다
 """
 
 import random
 
-from app.schemas import Answers, CharacterParameters, FaceFeatures, Stats
+from app.schemas import AnimalLook, Answers, CharacterParameters, FaceFeatures, Stats
 
 # 무작위로 뽑는 재료(동물 종류, 이름 낱말)에 쓴다. 참가자마다 매번 달라진다.
 _random = random.SystemRandom()
@@ -165,7 +168,7 @@ NONHUMAN_RACES = {
     "neon_city": (("자판기 머리", "게임기 머리"), ("브라운관 TV 머리", "헤드폰 머리"), ("네온사인 머리", "신호등 머리")),
 }
 
-# 실제 동물 캐릭터의 종류 후보: 응답이나 얼굴로 정하지 않고 참가자마다 이 풀에서 무작위로 뽑는다.
+# 실제 동물 캐릭터의 종류 전체. 동물상이 없을 때 여기서 무작위로 고른다 (있으면 ANIMAL_LOOK_POOLS).
 ANIMAL_POOL = (
     "수달", "해달", "물범", "복어", "펭귄", "돌고래", "해마", "거북",
     "햄스터", "토끼", "다람쥐", "날다람쥐", "고슴도치", "친칠라", "기니피그", "족제비",
@@ -173,7 +176,21 @@ ANIMAL_POOL = (
     "레서판다", "판다", "코알라", "나무늘보", "알파카", "양", "아기돼지", "카피바라",
     "부엉이", "올빼미", "참새", "앵무새", "오리", "병아리", "청개구리", "카멜레온",
 )
-ANIMAL_CANDIDATE_COUNT = 3
+
+# 동물상(프론트 faceLook.ts 의 10가지) → 그 인상을 닮은 동물. 가장 닮은 동물상의 풀에서 하나를 무작위로 고른다.
+# ANIMAL_POOL의 동물이 빠짐없이 한 번씩 들어 있다 (늑대·허스키는 늑대상용으로 추가).
+ANIMAL_LOOK_POOLS = {
+    "fox": ("여우상", ("여우", "사막여우", "레서판다", "고슴도치")),
+    "cat": ("고양이상", ("고양이", "친칠라", "부엉이", "올빼미")),
+    "dog": ("강아지상", ("강아지", "시바견", "퍼그", "물범")),
+    "rabbit": ("토끼상", ("토끼", "양", "병아리", "오리")),
+    "bear": ("곰상", ("판다", "코알라", "너구리", "카피바라")),
+    "monkey": ("원숭이상", ("해달", "수달", "나무늘보", "앵무새")),
+    "deer": ("사슴상", ("알파카", "해마", "날다람쥐", "참새", "돌고래", "펭귄")),
+    "dino": ("공룡상", ("거북", "카멜레온", "청개구리", "복어")),
+    "wolf": ("늑대상", ("늑대", "허스키", "족제비", "라쿤")),
+    "hamster": ("햄스터상", ("햄스터", "다람쥐", "기니피그", "아기돼지")),
+}
 RACE_TABLES = {"nonhuman": NONHUMAN_RACES}
 
 # 속성 후보: 기운 단계 × 시선 단계
@@ -210,12 +227,37 @@ PALETTES = {
     "midnight": ("남색과 은색", "검정과 달빛색", "짙은 보라와 에메랄드색"),
 }
 
-# 고유 능력: 응답(갖고 싶은 힘)
-ABILITIES = {
-    "read_minds": "마음의 소리를 듣는 힘",
-    "stop_time": "시간의 흐름을 멈추는 힘",
-    "fly": "바람을 타고 하늘을 나는 힘",
-    "transform": "무엇으로든 모습을 바꾸는 힘",
+# 고유 능력 = 얼굴에서 가장 두드러진 특징의 수식어(ABILITY_FLAVORS) + 갖고 싶은 힘(ABILITY_CORES)
+# 예: 멀리 떨어진 두 눈 + 마음 읽기 → "사방을 살피는 마음 청음"
+ABILITY_CORES = {
+    "read_minds": "마음 청음",
+    "stop_time": "시간 멈춤",
+    "fly": "바람 타기",
+    "transform": "모습 바꾸기",
+}
+# 얼굴 특징별 (점수가 낮을 때, 높을 때). FACE_TRAITS와 같은 항목이고 좋고 나쁨이 없는 말만 쓴다.
+ABILITY_FLAVORS = {
+    "face_aspect_ratio": ("둥글게 구르는", "길게 꿰뚫는"),
+    "eye_spacing_ratio": ("한 점을 겨누는", "사방을 살피는"),
+    "inner_eye_gap_ratio": ("촘촘히 엮는", "넓게 펼치는"),
+    "eye_position_ratio": ("높이 내다보는", "낮게 스며드는"),
+    "nose_length_ratio": ("재빠른", "멀리 닿는"),
+    "nose_width_ratio": ("날카로운", "든든한"),
+    "mouth_width_ratio": ("속삭이는", "울려 퍼지는"),
+    "lip_thickness_ratio": ("가볍게 스치는", "포근하게 감싸는"),
+    "jaw_width_ratio": ("날렵한", "묵직한"),
+}
+# 선택 이유 문장에 넣는 얼굴 특징 (낮을 때, 높을 때). 명사로 끝나야 조사를 붙일 수 있다.
+REASON_TRAITS = {
+    "face_aspect_ratio": ("가로로 둥근 얼굴선", "세로로 갸름한 얼굴선"),
+    "eye_spacing_ratio": ("가까이 모인 두 눈", "멀리 떨어진 두 눈"),
+    "inner_eye_gap_ratio": ("좁은 미간", "넓은 미간"),
+    "eye_position_ratio": ("높이 자리한 눈", "낮게 자리한 눈"),
+    "nose_length_ratio": ("짧은 콧대", "긴 콧대"),
+    "nose_width_ratio": ("좁은 콧볼", "넓은 콧볼"),
+    "mouth_width_ratio": ("작은 입", "큰 입"),
+    "lip_thickness_ratio": ("얇은 입술", "도톰한 입술"),
+    "jaw_width_ratio": ("갸름한 턱선", "넓은 턱선"),
 }
 
 # 설정 글에 들어갈 일화의 방향: 응답(위기 대처)
@@ -334,11 +376,56 @@ def _face_traits(scores: dict[str, float]) -> list[str]:
     return [FACE_TRAITS[name][scores[name] >= 0.5] for name in picked]
 
 
+def _signature(scores: dict[str, float]) -> tuple[str, int]:
+    """얼굴에서 가장 두드러진 특징(0.5에서 가장 먼 점수)과 방향(0 낮음 / 1 높음)."""
+    name = max(ABILITY_FLAVORS, key=lambda feature: abs(scores[feature] - 0.5))
+    return name, int(scores[name] >= 0.5)
+
+
+def _animal_look(animal_looks: list[AnimalLook]) -> tuple[str, int, str]:
+    """가장 닮은 동물상의 (이름, 비율, 고른 동물). 동물상이 없으면 동물 풀 전체에서 고른다."""
+    if not animal_looks:
+        return "", 0, _random.choice(ANIMAL_POOL)
+    top = max(animal_looks, key=lambda look: look.percent)
+    label, animals = ANIMAL_LOOK_POOLS[top.key]
+    return label, top.percent, _random.choice(animals)
+
+
+def _has_batchim(word: str) -> bool:
+    last = word.strip()[-1:]
+    return bool(last) and "가" <= last <= "힣" and (ord(last) - 0xAC00) % 28 != 0
+
+
+def _particle(word: str, with_batchim: str, without: str) -> str:
+    return word + (with_batchim if _has_batchim(word) else without)
+
+
+def _to(word: str) -> str:
+    """'~으로/로' (ㄹ받침은 '로')"""
+    last = word.strip()[-1:]
+    if _has_batchim(word) and (ord(last) - 0xAC00) % 28 != 8:
+        return word + "으로"
+    return word + "로"
+
+
+def build_reason(parameters: CharacterParameters, race: str) -> str:
+    """선택 이유: 가장 두드러진 얼굴 특징 → 고유 능력, 동물상(동물) 또는 실루엣(사물 머리) → 종족을 문장 틀에 넣는다."""
+    trait = _particle(parameters.signature_trait, "이", "가")
+    # 고유 능력은 "수식어 + 두 낱말 힘"(예: 사방을 살피는 + 마음 청음)이라 뒤 두 낱말을 떼면 수식어가 남는다
+    flavor = parameters.ability.rsplit(" ", 2)[0] if parameters.ability else ""
+    first = f"{trait} '{flavor}' 힘으로 끓어올랐고"
+    if parameters.animal_look:
+        return f"{first}, {parameters.animal_look}의 기운이 {parameters.animal_look_percent}%로 가장 짙어 {_to(race)} 태어났어요."
+    return f"{first}, {_particle(parameters.silhouette, '을', '를')} 닮아 {_to(race)} 태어났어요."
+
+
 def _name_hints() -> list[str]:
     return _random.sample(NAME_MODIFIERS, NAME_HINT_COUNT)
 
 
-def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParameters:
+def build_parameters(
+    features: FaceFeatures, answers: Answers, animal_looks: list[AnimalLook] | None = None
+) -> CharacterParameters:
     silhouette = _tier(features, "face_aspect_ratio")
     gaze = _tier(features, "eye_spacing_ratio")
     presence = _tier(features, "jaw_width_ratio")
@@ -347,6 +434,8 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
     scores = _face_scores(features)
 
     animal = answers.character_type == "animal"
+    signature, direction = _signature(scores)
+    look_label, look_percent, look_animal = _animal_look(animal_looks or []) if animal else ("", 0, "")
     races = None if animal else RACE_TABLES[answers.character_type][answers.place]
     near_silhouette = _nearest_other_tier(features, "face_aspect_ratio", silhouette)
     near_gaze = _nearest_other_tier(features, "eye_spacing_ratio", gaze)
@@ -365,9 +454,12 @@ def build_parameters(features: FaceFeatures, answers: Answers) -> CharacterParam
         crisis=CRISES[answers.crisis],
         lucky_item_type=LUCKY_ITEM_TYPES[answers.bag],
         palette=PALETTES[answers.time_of_day][eye_gap],
-        ability=ABILITIES[answers.power],
+        ability=f"{ABILITY_FLAVORS[signature][direction]} {ABILITY_CORES[answers.power]}",
+        signature_trait=REASON_TRAITS[signature][direction],
+        animal_look=look_label,
+        animal_look_percent=look_percent,
         race_candidates=(
-            _random.sample(ANIMAL_POOL, ANIMAL_CANDIDATE_COUNT)
+            [look_animal]
             if animal
             else [*races[silhouette], races[near_silhouette][0]]
         ),

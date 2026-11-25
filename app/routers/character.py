@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas import CharacterRequest, CharacterResponse
 from app.services.ai_character import CharacterAiError, decide_character
-from app.services.parameters import build_parameters
+from app.services.parameters import CHARACTER_TYPES, build_parameters, build_reason
 
 router = APIRouter()
 
@@ -36,7 +36,7 @@ def _settle_name(decision, name_hints: list[str]) -> None:
 
 @router.post("/character", response_model=CharacterResponse)
 def create_character(req: CharacterRequest):
-    parameters = build_parameters(req.features, req.answers)
+    parameters = build_parameters(req.features, req.answers, req.animal_looks)
     try:
         decision = decide_character(parameters)
     except CharacterAiError as error:
@@ -44,9 +44,14 @@ def create_character(req: CharacterRequest):
             status_code=503 if error.retryable else 500,
             detail={"message": str(error), "retryable": error.retryable},
         ) from error
+    # 동물 종족은 동물상으로 룰이 고른 하나다. 모델이 다른 동물을 쓰면 되돌린다.
+    if parameters.character_type == CHARACTER_TYPES["animal"]:
+        decision.race = parameters.race_candidates[0]
     _settle_name(decision, parameters.name_hints)
     return CharacterResponse(
         **decision.model_dump(),
         palette=parameters.palette,
+        ability=parameters.ability,
+        reason=build_reason(parameters, decision.race),
         parameters=parameters,
     )
