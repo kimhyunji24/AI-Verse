@@ -80,7 +80,7 @@ import {
   type PoseLandmark,
   renderSkeletonPng,
 } from "@/lib/poseSkeleton";
-import { playPlop, playPoof } from "@/lib/sound";
+import { playPlop, playSparkle } from "@/lib/sound";
 
 type Step =
   | "align"
@@ -320,7 +320,7 @@ export default function ObservatoryFlow() {
         await drawCard(created);
         setStep("card");
         setFlash(true);
-        playPoof();
+        playSparkle();
       } catch (error) {
         setFailure(
           error instanceof CharacterApiError
