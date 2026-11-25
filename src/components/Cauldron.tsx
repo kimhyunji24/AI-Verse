@@ -82,12 +82,6 @@ export default function Cauldron({
         </span>
       ))}
 
-      {model !== "failed" && (
-        <div className={`absolute inset-0 transition-opacity duration-700 ${show3d ? "opacity-100" : "opacity-0"}`}>
-          <CauldronModel mood={mood} onStatus={setModel} />
-        </div>
-      )}
-
       <svg
         viewBox="0 0 400 400"
         className={`relative h-full w-full ${active && !show3d ? "anim-shake" : ""}`}
@@ -145,6 +139,13 @@ export default function Cauldron({
         </g>
         )}
       </svg>
+
+      {/* 3D 솥은 불꽃 위에 겹쳐 솥 몸통이 불꽃을 가리게 한다 */}
+      {model !== "failed" && (
+        <div className={`absolute inset-0 transition-opacity duration-700 ${show3d ? "opacity-100" : "opacity-0"}`}>
+          <CauldronModel mood={mood} onStatus={setModel} />
+        </div>
+      )}
     </div>
   );
 }

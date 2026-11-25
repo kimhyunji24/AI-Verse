@@ -20,8 +20,9 @@ import type { CauldronMood } from "@/components/Cauldron";
 
 const MODEL_URL = "/models/cauldron.glb";
 
-// 물약 표면 위치 (모델 경계 상자 기준): 높이는 위에서 몇 %, 반지름은 모델 폭의 몇 %
-const SURFACE = { fromTop: 0.12, radius: 0.36 };
+// 물약 표면 위치. 모델 높이를 1로 맞춘 뒤의 값이다 (y: 바닥에서 높이, x: 가운데에서 옆으로, radius: 반지름).
+// 이 모델은 손잡이가 위로 솟아 있어 물약은 높이의 절반쯤에 있다.
+const SURFACE = { y: 0.565, x: 0.04, radius: 0.19 };
 
 const BREW_COLORS: Record<CauldronMood, number> = {
   idle: 0x34d399,
@@ -111,7 +112,9 @@ export default function CauldronModel({
         return;
       }
 
-      // 모델을 원점 가운데·바닥에 놓고 높이를 1로 맞춘다
+      // 모델을 원점 가운데·바닥에 놓고 높이를 1로 맞춘다. 물약·거품은 같이 돌고 떨리도록 rig에 함께 넣는다.
+      const rig = new THREE.Group();
+      scene.add(rig);
       const pot = new THREE.Group();
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
@@ -121,18 +124,16 @@ export default function CauldronModel({
       model.position.set(-center.x, -box.min.y, -center.z);
       pot.add(model);
       pot.scale.setScalar(unit);
-      scene.add(pot);
-      const width = size.x * unit;
-      const top = 1;
+      rig.add(pot);
 
-      // 물약 표면: 빛나는 원판
-      const surfaceY = top - SURFACE.fromTop;
-      const surfaceR = width * SURFACE.radius;
+      // 물약 표면: 모델의 물약 위에 살짝 얹어 상태에 따라 색을 바꾼다
+      const surfaceY = SURFACE.y;
+      const surfaceR = SURFACE.radius;
       const brewMaterial = new THREE.MeshBasicMaterial({ color: BREW_COLORS[moodRef.current], transparent: true, opacity: 0.92 });
       const surface = new THREE.Mesh(new THREE.CircleGeometry(surfaceR, 48), brewMaterial);
       surface.rotation.x = -Math.PI / 2;
-      surface.position.y = surfaceY;
-      scene.add(surface);
+      surface.position.set(SURFACE.x, surfaceY, 0);
+      rig.add(surface);
       // 표면 위로 번지는 빛 (더하기 섞기)
       const glowMaterial = new THREE.MeshBasicMaterial({
         color: BREW_COLORS[moodRef.current],
@@ -143,9 +144,9 @@ export default function CauldronModel({
       });
       const glow = new THREE.Mesh(new THREE.CircleGeometry(surfaceR * 1.5, 48), glowMaterial);
       glow.rotation.x = -Math.PI / 2;
-      glow.position.y = surfaceY + 0.01;
-      scene.add(glow);
-      brewLight.position.set(0, surfaceY + 0.25, 0);
+      glow.position.set(SURFACE.x, surfaceY + 0.01, 0);
+      rig.add(glow);
+      brewLight.position.set(SURFACE.x, surfaceY + 0.25, 0);
       fire.position.set(0, 0.05, 0.4);
 
       // 거품: 표면에서 부풀었다가 터진다
@@ -153,15 +154,15 @@ export default function CauldronModel({
       const bubbleGeometry = new THREE.SphereGeometry(1, 12, 8);
       const bubbles = Array.from({ length: 9 }, (_, i) => {
         const mesh = new THREE.Mesh(bubbleGeometry, bubbleMaterial.clone());
-        scene.add(mesh);
+        rig.add(mesh);
         const angle = (i / 9) * Math.PI * 2 + i;
         const dist = surfaceR * (0.2 + ((i * 37) % 10) / 14);
-        return { mesh, x: Math.cos(angle) * dist, z: Math.sin(angle) * dist, offset: i * 0.37 };
+        return { mesh, x: SURFACE.x + Math.cos(angle) * dist, z: Math.sin(angle) * dist, offset: i * 0.37 };
       });
 
       // 카메라: 솥을 살짝 내려다보게
-      camera.position.set(0, 0.95, 2.6);
-      camera.lookAt(0, 0.45, 0);
+      camera.position.set(0, 1.05, 2.0);
+      camera.lookAt(0, 0.47, 0);
 
       onStatusRef.current("ready");
 
@@ -186,10 +187,10 @@ export default function CauldronModel({
         fire.intensity = 5 + Math.sin(t * 11) * 1.2 + Math.sin(t * 17.3) * 0.8;
 
         // 솥: 천천히 좌우로 돌고, 끓을 때는 덜덜 떤다
-        pot.rotation.y = Math.sin(t * 0.4) * 0.25;
+        rig.rotation.y = Math.sin(t * 0.4) * 0.25;
         const shake = current === "boiling" ? 0.012 : current === "charging" ? 0.006 : 0;
-        pot.position.x = shake * Math.sin(t * 61);
-        pot.position.z = shake * Math.cos(t * 53);
+        rig.position.x = shake * Math.sin(t * 61);
+        rig.position.z = shake * Math.cos(t * 53);
 
         for (const b of bubbles) {
           const cycle = ((t * speed * 0.8 + b.offset) % 1 + 1) % 1;
