@@ -195,14 +195,3 @@ export function faceShape(m: FaceMeasure): { shape: FaceShape; reason: string } 
   }
   return { shape: "계란형", reason: `세로/가로 ${ratio.toFixed(2)}, 턱끝 ${Math.round(m.chin_angle)}°로 균형 잡힌 비율` };
 }
-
-/** 평균 대비 몇 % 크거나 작은지 */
-export function versusAverage(key: keyof FaceMeasure, value: number) {
-  const ref = REF[key];
-  if (key.startsWith("eye_tilt") || key === "chin_angle") {
-    const diff = value - ref;
-    return Math.abs(diff) < 1 ? "평균" : `평균보다 ${diff > 0 ? "+" : ""}${diff.toFixed(1)}°`;
-  }
-  const pct = ((value - ref) / ref) * 100;
-  return Math.abs(pct) < 3 ? "평균" : `평균보다 ${pct > 0 ? "+" : ""}${Math.round(pct)}%`;
-}
