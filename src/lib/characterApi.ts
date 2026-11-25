@@ -18,6 +18,7 @@
  *   - 2026-11-22 캐릭터 유형 '애니메이션 캐릭터'를 '실제 동물'로 교체 (값 anime → animal)
  *   - 2026-11-22 캐릭터 유형 표시 이름을 '실제 동물'에서 '동물 머리'로 변경
  *   - 2026-11-24 질문·선택지 화면 문구 수정 (내부 값은 그대로)
+ *   - 2026-11-26 닮은 동물상(animal_looks)을 캐릭터 요청에 함께 보냄, 능력치 이름(stat_names) 타입 추가
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -125,6 +126,12 @@ export type Stats = {
   luck: number;
 };
 
+/** 능력치 이름. 캐릭터마다 GPT가 짓는다 (예: insight → 물결감지) */
+export type StatNames = Record<keyof Stats, string>;
+
+/** 닮은 동물상 (faceLook.ts 의 ANIMALS key). 동물 캐릭터의 종족을 고르는 데 쓴다. */
+export type AnimalLook = { key: string; percent: number };
+
 export type Character = {
   name: string;
   race: string;
@@ -134,6 +141,8 @@ export type Character = {
   palette: string;
   ability: string;
   stats: Stats;
+  stat_names?: StatNames;
+  /** 고유 능력과 선택 이유는 백엔드가 얼굴 패턴 표로 정한다 */
   reason: string;
   backstory: string;
   lucky_item: string;
@@ -184,8 +193,13 @@ async function post<T>(path: string, body: unknown, fallback: string): Promise<T
 export function createCharacter(
   features: FaceFeatures,
   answers: Answers,
+  animalLooks: AnimalLook[] = [],
 ): Promise<Character> {
-  return post("/api/character", { features, answers }, "캐릭터 생성에 실패했어요");
+  return post(
+    "/api/character",
+    { features, answers, animal_looks: animalLooks },
+    "캐릭터 생성에 실패했어요",
+  );
 }
 
 /**

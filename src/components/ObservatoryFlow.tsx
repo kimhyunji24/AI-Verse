@@ -26,6 +26,7 @@
  *   - 2026-11-24 얼굴 세부 수치 14개로 동물상 유사도를 계산해 상위 3개를 재료로 넣고, 질문 화면에 AI 얼굴 분석 패널 표시
  *   - 2026-11-24 얼굴 측정 뒤 정밀 분석 화면(analysis) 추가: 홍채 지름 기준 mm 실측, 측정선이 그려진 사진, 얼굴형·대칭·비율표
  *   - 2026-11-26 인쇄를 부스 PC 프린터로 바로 보내도록 변경(/api/print), 실패하면 인쇄 창으로 대신함
+ *   - 2026-11-26 캐릭터 요청에 닮은 동물상 상위 3개를 보내 동물 캐릭터 종족을 고르게 함
  */
 
 "use client";
@@ -306,7 +307,12 @@ export default function ObservatoryFlow() {
       );
       try {
         const [created] = await Promise.all([
-          createCharacter(measured, answered),
+          // 닮은 동물상 상위 3개를 보내 동물 캐릭터의 종족을 고르게 한다
+          createCharacter(
+            measured,
+            answered,
+            (faceLook?.animals ?? []).slice(0, 3).map(({ animal, percent }) => ({ key: animal.key, percent })),
+          ),
           minimumBrew,
         ]);
         setCharacter(created);
@@ -324,7 +330,7 @@ export default function ObservatoryFlow() {
         setStep("failed");
       }
     },
-    [drawCard],
+    [drawCard, faceLook],
   );
 
   // 다음 참가자를 위해 이전 참가자의 데이터를 모두 지운다
