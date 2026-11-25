@@ -70,7 +70,8 @@ body {
 .anim-drop { animation: ingredient-drop 1.3s cubic-bezier(0.5, 0, 0.8, 0.6) both; }
 .anim-shake { animation: pot-shake 0.22s linear infinite; }
 .anim-poof { animation: poof 1.2s ease-out both; }
-.anim-card-appear { animation: card-appear 0.9s ease-out both; }
+/* backwards만 쓴다: 끝난 뒤에도 애니메이션 값(both/forwards)을 붙잡고 있으면 크롬이 처음 작게(scale 0.86) 그린 글씨를 그대로 써서 글씨가 흐려진다 */
+.anim-card-appear { animation: card-appear 0.9s ease-out backwards; }
 .anim-card-print { animation: card-print 1.8s cubic-bezier(0.6, 0, 0.8, 0.4) both; }
 
 @media (prefers-reduced-motion: reduce) {
