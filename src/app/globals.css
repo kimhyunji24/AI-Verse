@@ -77,23 +77,25 @@ body {
   .anim-smoke, .anim-flame, .anim-bubble, .anim-shake { animation: none; }
 }
 
-/* 카드 등장 연출 (CardReveal): 뒷면 떠오름 → 빛 리본 두 줄 → 은은한 빛 → 뒤집혀 앞면 */
+/* 카드 등장 연출 (CardReveal): 카드 공개 영상 → 마지막 장면에서 대기 → 누르면 섬광과 함께 앞면 */
 .reveal-stage { perspective: 1400px; }
-/* 빛 캔버스는 카드보다 크게, 카드 중심에 맞춰 깐다 (revealFx.ts가 캔버스 중심을 카드 중심으로 쓴다) */
-.reveal-fx { position: absolute; left: -45%; top: -30%; width: 190%; height: 160%; pointer-events: none; }
-/* 떠오르기(투명도)와 뒤집기(3D)를 다른 요소에 둔다. 같은 요소에 걸면 3D가 평면으로 처리돼 앞면이 안 나온다. */
-.reveal-lift { position: absolute; inset: 0; animation: reveal-float 0.7s ease-out both; }
-/* 흔들림과 뒤집기는 revealFx.ts가 매 프레임 transform을 직접 바꾼다 */
-.reveal-card { position: absolute; inset: 0; transform-style: preserve-3d; }
-.reveal-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 1rem; overflow: hidden; }
-.reveal-back { box-shadow: 0 0 50px rgba(236, 208, 156, 0.45); }
-.reveal-front { transform: rotateY(180deg); }
-.reveal-front > img { width: 100%; height: 100%; display: block; }
+.reveal-back, .reveal-front, .reveal-flash { position: absolute; inset: 0; border-radius: 1rem; overflow: hidden; }
+.reveal-back { animation: reveal-float 0.7s ease-out both; box-shadow: 0 0 50px rgba(236, 208, 156, 0.35); }
+.reveal-back > video, .reveal-back > img, .reveal-front > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.reveal-flash { pointer-events: none; background: radial-gradient(circle at 50% 50%, #fffaf0 0%, #ffe2a8 35%, rgba(245, 200, 105, 0.6) 60%, transparent 80%); animation: reveal-flash 1.2s ease-out both; }
+/* 섬광이 가장 밝을 때 뒷면은 커지며 사라지고, 앞면이 돌아 들어온다 */
+.reveal-stage[data-revealed] .reveal-back { animation: reveal-back-out 0.5s ease-in both; }
+.reveal-front { animation: reveal-front-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.25s both; }
 @keyframes reveal-float { 0% { opacity: 0; transform: translateY(40px) scale(0.9); } 100% { opacity: 1; transform: none; } }
+@keyframes reveal-back-out { 0% { opacity: 1; transform: none; filter: brightness(1); } 100% { opacity: 0; transform: scale(1.08); filter: brightness(2.2); } }
+@keyframes reveal-front-in { 0% { opacity: 0; transform: rotateY(90deg) scale(0.92); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes reveal-flash { 0% { opacity: 0; transform: scale(0.6); } 25% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.4); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-lift { animation: none; }
-  .reveal-fx { display: none; }
+  .reveal-back, .reveal-stage[data-revealed] .reveal-back { animation: none; }
+  .reveal-stage[data-revealed] .reveal-back { opacity: 0; }
+  .reveal-front { animation: none; }
+  .reveal-flash { display: none; }
 }
 
 /* 인쇄: 화면에는 숨겨 둔 카드 이미지 한 장만 100×148mm 종이에 꽉 차게 찍는다 */
