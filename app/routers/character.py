@@ -48,6 +48,5 @@ def create_character(req: CharacterRequest):
     return CharacterResponse(
         **decision.model_dump(),
         palette=parameters.palette,
-        ability=parameters.ability,
         parameters=parameters,
     )

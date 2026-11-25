@@ -111,6 +111,17 @@ class CharacterParameters(BaseModel):
     emotion: str = ""
 
 
+class StatNames(BaseModel):
+    """능력치 6개의 이름. GPT가 캐릭터 세계관에 맞게 캐릭터마다 새로 짓는다 (예: insight → 물결감지)."""
+
+    insight: str
+    vitality: str
+    resonance: str
+    agility: str
+    willpower: str
+    luck: str
+
+
 class AiDecision(BaseModel):
     """GPT의 결정과 글. 룰이 고치지 않고 그대로 카드에 쓴다."""
 
@@ -118,6 +129,10 @@ class AiDecision(BaseModel):
     element: str
     disposition: str
     stats: Stats
+    # 능력치 이름 (캐릭터마다 다름)
+    stat_names: StatNames
+    # 고유 능력 이름. 룰이 정한 힘의 방향(parameters.ability)을 바탕으로 GPT가 짓는다.
+    ability: str
     reason: str
     name: str
     appearance: str
@@ -128,7 +143,8 @@ class AiDecision(BaseModel):
 
 class CharacterResponse(AiDecision):
     palette: str
-    ability: str
+    # 예전 카드 요청에는 없을 수 있다. 없으면 기본 이름(통찰·생명력…)을 쓴다.
+    stat_names: StatNames | None = None
     # 어떤 파라미터로 만들어졌는지 체험 화면에 보여주기 위해 함께 반환한다
     parameters: CharacterParameters
 
