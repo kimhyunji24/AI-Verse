@@ -15,6 +15,8 @@
  *   - 2026-11-22 애니메이션 캐릭터 선택지를 실제 동물로 바꾸며 재료를 동물 발자국으로 변경
  *   - 2026-11-22 캐릭터 유형 재료 이름을 선택지와 바로 연결되게 변경 (말하는 찻주전자 → 사물 머리)
  *   - 2026-11-22 동물 머리 재료 이름을 '작은 발자국'에서 '동물 머리'로 변경
+ *   - 2026-11-24 어색한 재료 이름 교체 (속삭이는 뇌, 녹슨 검 등)
+ *   - 2026-11-24 얼굴 재료를 동물상 유사도 재료(faceLookIngredients)로 교체. faceIngredients는 남겨 둠
  */
 
 import type { IconType } from "react-icons";
@@ -59,6 +61,7 @@ import {
   GiWrappedSweet,
 } from "react-icons/gi";
 import type { FaceFeatures } from "@/lib/faceFeatures";
+import type { FaceLook } from "@/lib/faceLook";
 
 type IngredientLook = { Icon: IconType; label: string; color: string };
 
@@ -95,6 +98,16 @@ export function faceIngredients(features: FaceFeatures): Ingredient[] {
   ];
 }
 
+/** 얼굴 분석에서 가장 닮은 동물상 3개를 "여우상 41%" 같은 재료로 만든다 */
+export function faceLookIngredients(look: FaceLook): Ingredient[] {
+  return look.animals.slice(0, 3).map(({ animal, percent }) => ({
+    key: `look:${animal.key}`,
+    Icon: animal.Icon,
+    label: `${animal.label} ${percent}%`,
+    color: animal.color,
+  }));
+}
+
 // 설문 선택지별 재료. 키는 lib/characterApi.ts 의 QUESTIONS 값과 같다.
 export const ANSWER_INGREDIENTS: Record<string, IngredientLook> = {
   nonhuman: { Icon: GiTeapot, label: "사물 머리", color: "#a78bfa" },
@@ -103,10 +116,10 @@ export const ANSWER_INGREDIENTS: Record<string, IngredientLook> = {
   night_sky: { Icon: GiFallingStar, label: "떨어진 별", color: "#fde047" },
   old_library: { Icon: GiScrollUnfurled, label: "낡은 책장", color: "#d6b98c" },
   neon_city: { Icon: GiWrappedSweet, label: "네온 사탕", color: "#f0abfc" },
-  alone: { Icon: GiCandleFlame, label: "외딴 촛불", color: "#fdba74" },
+  alone: { Icon: GiCandleFlame, label: "작은 촛불", color: "#fdba74" },
   one_friend: { Icon: GiCherry, label: "쌍둥이 열매", color: "#fb7185" },
   crowd: { Icon: GiFrog, label: "개구리 합창", color: "#86efac" },
-  adventure: { Icon: GiCompass, label: "녹슨 나침반", color: "#fbbf24" },
+  adventure: { Icon: GiCompass, label: "나침반 하나", color: "#fbbf24" },
   rest: { Icon: GiFluffyCloud, label: "포근한 구름", color: "#e0e7ff" },
   growth: { Icon: GiSprout, label: "새싹 뿌리", color: "#4ade80" },
   connection: { Icon: GiSewingString, label: "붉은 실", color: "#f87171" },
@@ -114,16 +127,16 @@ export const ANSWER_INGREDIENTS: Record<string, IngredientLook> = {
   noon: { Icon: GiSun, label: "한낮의 태양 조각", color: "#facc15" },
   sunset: { Icon: GiSunset, label: "노을 한 줌", color: "#fb923c" },
   midnight: { Icon: GiNightSky, label: "한밤의 어둠", color: "#a5b4fc" },
-  confront: { Icon: GiBroadsword, label: "녹슨 검", color: "#cbd5e1" },
+  confront: { Icon: GiBroadsword, label: "용기 한 스푼", color: "#cbd5e1" },
   hide: { Icon: GiHood, label: "그림자 망토", color: "#a78bfa" },
   trick: { Icon: GiFoxTail, label: "여우 꼬리", color: "#fb923c" },
   call_friends: { Icon: GiMightyHorn, label: "뿔피리", color: "#fcd34d" },
-  read_minds: { Icon: GiBrain, label: "속삭이는 뇌", color: "#f9a8d4" },
+  read_minds: { Icon: GiBrain, label: "속삭임 깃털", color: "#f9a8d4" },
   stop_time: { Icon: GiHourglass, label: "멈춘 모래시계", color: "#fde68a" },
   fly: { Icon: GiFluffyWing, label: "바람 날개", color: "#bae6fd" },
-  transform: { Icon: GiDualityMask, label: "둔갑 가면", color: "#d8b4fe" },
-  snack: { Icon: GiCookie, label: "마녀 쿠키", color: "#d6b98c" },
-  book: { Icon: GiSpellBook, label: "주문서", color: "#c4b5fd" },
+  transform: { Icon: GiDualityMask, label: "변신 가면", color: "#d8b4fe" },
+  snack: { Icon: GiCookie, label: "별모양 쿠키", color: "#d6b98c" },
+  book: { Icon: GiSpellBook, label: "손때 묻은 책", color: "#c4b5fd" },
   map: { Icon: GiTreasureMap, label: "보물 지도", color: "#fcd34d" },
   charm: { Icon: GiClover, label: "네잎클로버", color: "#4ade80" },
 };
