@@ -9,7 +9,6 @@
  *
  * 수정 이력:
  *   - 2026-11-24 최초 작성
- *   - 2026-11-26 사진이 뿌옇게 보이던 문제: 캔버스를 화면 픽셀 크기로 그리고 어둡게 덮는 막을 옅게
  */
 
 "use client";
@@ -69,12 +68,8 @@ function SnapshotCanvas({
       const cropH = Math.min(H, cropW * 1.25);
       const x0 = Math.max(0, Math.min(W - cropW, cx - cropW / 2));
       const y0 = Math.max(0, Math.min(H - cropH, cy - cropH / 2));
-      // 잘라 낸 사진은 작아서 화면에 늘리면 사진·글씨·선이 다 뿌옇게 보인다.
-      // 캔버스를 실제 화면 픽셀 크기로 만들고 그 위에 그려서 측정선과 글씨는 선명하게, 사진은 부드럽게 키운다.
-      const k = Math.max(1, (canvas.clientWidth * window.devicePixelRatio) / cropW);
-      canvas.width = Math.round(cropW * k);
-      canvas.height = Math.round(cropH * k);
-      ctx.imageSmoothingQuality = "high";
+      canvas.width = Math.round(cropW);
+      canvas.height = Math.round(cropH);
       // 거울처럼 보이도록 x를 뒤집는다 (사진·점 모두). 좌표는 잘라 낸 영역 기준
       const X = (lm: Landmark) => (1 - lm.x) * W - x0;
       const Y = (lm: Landmark) => lm.y * H - y0;
@@ -83,14 +78,13 @@ function SnapshotCanvas({
 
       const draw = (now: number) => {
         const t = now - start;
-        ctx.setTransform(k, 0, 0, k, 0, 0);
         ctx.save();
         ctx.translate(-x0, -y0);
         ctx.translate(W, 0);
         ctx.scale(-1, 1);
         ctx.drawImage(image, 0, 0, W, H);
         ctx.restore();
-        ctx.fillStyle = "rgba(10, 6, 20, 0.15)";
+        ctx.fillStyle = "rgba(10, 6, 20, 0.35)";
         ctx.fillRect(0, 0, cropW, cropH);
 
         // 얼굴 점: 위에서 아래로 훑으며 나타난다
