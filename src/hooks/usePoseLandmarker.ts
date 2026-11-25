@@ -9,6 +9,7 @@
  * 수정 이력:
  *   - 2026-11-22 최초 작성
  *   - 2026-11-22 손가락과 손 모양을 잡는 GestureRecognizer 추가
+ *   - 2026-11-26 wasm·모델을 CDN 대신 public/mediapipe/ 에서 불러오도록 변경
  */
 
 "use client";
@@ -19,11 +20,11 @@ import type { LandmarkerStatus } from "@/hooks/useFaceLandmarker";
 import { type Gesture, GESTURES, type Hand, type PoseLandmark } from "@/lib/poseSkeleton";
 
 const WASM_URL =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.0/wasm";
+  "/mediapipe/wasm";
 const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+  "/mediapipe/pose_landmarker_lite.task";
 const GESTURE_MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task";
+  "/mediapipe/gesture_recognizer.task";
 
 type Models = { pose: PoseLandmarker; gesture: GestureRecognizer | null };
 

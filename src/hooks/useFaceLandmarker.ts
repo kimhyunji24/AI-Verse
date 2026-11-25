@@ -2,12 +2,12 @@
  * 얼굴 랜드마크 훅 (useFaceLandmarker)
  *
  * 역할: MediaPipe FaceLandmarker를 불러오고, 영상의 새 프레임마다 랜드마크를 계산해 onFrame으로 넘긴다.
- * 비고: 모든 계산은 브라우저 안에서 이루어진다. wasm과 모델은 처음 한 번 CDN에서 받으므로 인터넷이 필요하다.
- *       wasm 버전은 package.json 의 @mediapipe/tasks-vision 버전과 같아야 한다.
+ * 비고: 모든 계산은 브라우저 안에서 이루어진다. wasm과 모델은 public/mediapipe/ 에서 불러오므로 인터넷이 없어도 된다 (scripts/fetch-mediapipe.mjs 가 준비).
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 모델을 한 번만 로드하도록 변경, MediaPipe 안내 로그가 오류로 표시되지 않도록 처리
+ *   - 2026-11-26 wasm·모델을 CDN 대신 public/mediapipe/ 에서 불러오도록 변경
  */
 
 "use client";
@@ -17,9 +17,9 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import type { Landmark } from "@/lib/faceFeatures";
 
 const WASM_URL =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.0/wasm";
+  "/mediapipe/wasm";
 const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+  "/mediapipe/face_landmarker.task";
 
 export type LandmarkerStatus = "loading" | "ready" | "error";
 
