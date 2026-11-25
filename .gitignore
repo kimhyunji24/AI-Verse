@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# mediapipe wasm·모델 (scripts/fetch-mediapipe.mjs 가 받음)
+/public/mediapipe/

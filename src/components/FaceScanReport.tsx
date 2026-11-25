@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Landmark } from "@/lib/faceFeatures";
 import type { FaceLook } from "@/lib/faceLook";
-import { type FaceMeasure, faceShape, versusAverage } from "@/lib/faceMeasure";
+import { type FaceMeasure, faceShape } from "@/lib/faceMeasure";
 
 // 치수 글씨 위치: 선의 위/아래/왼쪽 끝 바깥/오른쪽 끝 바깥
 type Side = "above" | "below" | "left" | "right";
@@ -226,34 +226,34 @@ export default function FaceScanReport({
 
         <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
           <Section title="얼굴" delay={base + 200}>
-            <Row label="가로 (광대)" value={mm(m.face_width)} note={versusAverage("face_width", m.face_width)} />
-            <Row label="세로" value={mm(m.face_height)} note={versusAverage("face_height", m.face_height)} />
+            <Row label="가로 (광대)" value={mm(m.face_width)} />
+            <Row label="세로" value={mm(m.face_height)} />
             <Row label="세로 / 가로" value={(m.face_height / m.face_width).toFixed(2)} />
-            <Row label="턱 너비" value={mm(m.jaw_width)} note={versusAverage("jaw_width", m.jaw_width)} />
-            <Row label="턱끝 각도" value={`${m.chin_angle.toFixed(1)}°`} note={versusAverage("chin_angle", m.chin_angle)} />
+            <Row label="턱 너비" value={mm(m.jaw_width)} />
+            <Row label="턱끝 각도" value={`${m.chin_angle.toFixed(1)}°`} />
             <Row label="좌우 대칭도" value={`${m.symmetry.toFixed(1)}%`} />
           </Section>
 
           <Section title="눈" delay={base + 500}>
-            <Row label="눈 가로 (오른 / 왼)" value={`${m.eye_width_r.toFixed(1)} / ${m.eye_width_l.toFixed(1)}mm`} note={versusAverage("eye_width_r", eyeAvg)} />
+            <Row label="눈 가로 (오른 / 왼)" value={`${m.eye_width_r.toFixed(1)} / ${m.eye_width_l.toFixed(1)}mm`} />
             <Row label="눈 세로 (오른 / 왼)" value={`${m.eye_height_r.toFixed(1)} / ${m.eye_height_l.toFixed(1)}mm`} />
             <Row label="눈꼬리 각도 (오른 / 왼)" value={`${deg(m.eye_tilt_r)} / ${deg(m.eye_tilt_l)}`} />
             <Row label="미간" value={mm(m.inner_eye_gap)} note={`눈 가로의 ${(m.inner_eye_gap / eyeAvg).toFixed(2)}배`} />
-            <Row label="동공 사이" value={mm(m.pupil_distance)} note={versusAverage("pupil_distance", m.pupil_distance)} />
-            <Row label="눈썹 ~ 눈" value={mm(m.brow_to_eye)} note={versusAverage("brow_to_eye", m.brow_to_eye)} />
+            <Row label="동공 사이" value={mm(m.pupil_distance)} />
+            <Row label="눈썹 ~ 눈" value={mm(m.brow_to_eye)} />
           </Section>
 
           <Section title="코" delay={base + 800}>
-            <Row label="코 길이" value={mm(m.nose_length)} note={versusAverage("nose_length", m.nose_length)} />
-            <Row label="콧볼 너비" value={mm(m.nose_width)} note={versusAverage("nose_width", m.nose_width)} />
+            <Row label="코 길이" value={mm(m.nose_length)} />
+            <Row label="콧볼 너비" value={mm(m.nose_width)} />
             <Row label="콧볼 / 미간" value={(m.nose_width / m.inner_eye_gap).toFixed(2)} />
           </Section>
 
           <Section title="입 · 비율" delay={base + 1100}>
-            <Row label="입 너비" value={mm(m.mouth_width)} note={versusAverage("mouth_width", m.mouth_width)} />
+            <Row label="입 너비" value={mm(m.mouth_width)} />
             <Row label="윗입술 / 아랫입술" value={`${m.upper_lip.toFixed(1)} / ${m.lower_lip.toFixed(1)}mm`} note={`1 : ${lipRatio.toFixed(2)}`} />
-            <Row label="인중" value={mm(m.philtrum)} note={versusAverage("philtrum", m.philtrum)} />
-            <Row label="턱 길이" value={mm(m.chin_length)} note={versusAverage("chin_length", m.chin_length)} />
+            <Row label="인중" value={mm(m.philtrum)} />
+            <Row label="턱 길이" value={mm(m.chin_length)} />
             <Row label="중안부 : 하안부" value={`${mm(m.midface)} : ${mm(m.lowerface)}`} note={`1 : ${thirds.toFixed(2)}`} />
           </Section>
         </div>

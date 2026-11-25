@@ -25,6 +25,7 @@
  *   - 2026-11-24 솥에서 나온 카드는 뒷면으로 기다리다 누르면 앞면이 보이고, 그 뒤 "내 카드 인쇄하기"로 실제 인쇄(100×148mm)
  *   - 2026-11-24 얼굴 세부 수치 14개로 동물상 유사도를 계산해 상위 3개를 재료로 넣고, 질문 화면에 AI 얼굴 분석 패널 표시
  *   - 2026-11-24 얼굴 측정 뒤 정밀 분석 화면(analysis) 추가: 홍채 지름 기준 mm 실측, 측정선이 그려진 사진, 얼굴형·대칭·비율표
+ *   - 2026-11-26 인쇄를 부스 PC 프린터로 바로 보내도록 변경(/api/print), 실패하면 인쇄 창으로 대신함
  */
 
 "use client";
@@ -374,13 +375,31 @@ export default function ObservatoryFlow() {
     if (photocard) setRevealed(true);
   }, [photocard]);
 
-  // 앞면을 본 뒤 인쇄한다. 인쇄 창이 닫히면 카드가 아래로 내려가며 다음 참가자로 넘어간다.
+  // 앞면을 본 뒤 인쇄한다. 부스 PC의 프린터로 바로 보내고(/api/print), 안 되면 브라우저 인쇄 창을 띄운다.
+  // 인쇄가 넘어가면 카드가 아래로 내려가며 다음 참가자로 넘어간다.
   // 다시 그려도 소용없는 실패면 글 카드로라도 마무리한다.
+  const sendingPrint = useRef(false);
   const pressCard = useCallback(() => {
     if (photocard && !revealed) setRevealed(true);
     else if (photocard) {
-      window.print();
-      setStep("printing");
+      if (sendingPrint.current) return;
+      sendingPrint.current = true;
+      fetch("/api/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_url: photocard.card_url }),
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        })
+        .catch((error) => {
+          console.error("자동 인쇄 실패, 인쇄 창으로 대신함", error);
+          window.print();
+        })
+        .finally(() => {
+          sendingPrint.current = false;
+          setStep("printing");
+        });
     } else if (cardFailure && !cardFailure.retryable) setStep("printing");
     else if (cardFailure && character) drawCard(character);
   }, [photocard, revealed, cardFailure, character, drawCard]);

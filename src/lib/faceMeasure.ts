@@ -7,7 +7,6 @@
  * 비고: 카메라 화면의 길이를 mm로 바꾸는 기준은 홍채 지름이다. 사람 홍채 지름은 나이·체격과 상관없이
  *       거의 11.7mm로 일정해서, 화면에서 홍채가 몇 칸인지 재면 1칸이 몇 mm인지 알 수 있다.
  *       홍채 점이 없으면(구형 모델) 성인 얼굴 폭 평균 140mm를 기준으로 한다.
- *       평균값(REF)은 MediaPipe 표준 얼굴 모델(canonical_face_model.obj)을 mm로 잰 값이다.
  *       이미지는 저장하지 않고 이 숫자들만 화면에 보여 준다.
  *
  * 수정 이력:
@@ -43,33 +42,6 @@ export type FaceMeasure = {
   midface: number; // 중안부 (눈썹선~코 밑)
   lowerface: number; // 하안부 (코 밑~턱끝)
   symmetry: number; // 좌우 대칭도 (%)
-};
-
-/** MediaPipe 표준 얼굴을 mm로 잰 평균값 */
-export const REF: FaceMeasure = {
-  face_width: 153.3,
-  face_height: 176.7,
-  jaw_width: 118.8,
-  chin_angle: 123.7,
-  eye_width_r: 26.6,
-  eye_width_l: 26.6,
-  eye_height_r: 6.8,
-  eye_height_l: 6.8,
-  eye_tilt_r: 1.7,
-  eye_tilt_l: 1.7,
-  inner_eye_gap: 37.1,
-  pupil_distance: 63.0,
-  brow_to_eye: 23.7,
-  nose_length: 54.2,
-  nose_width: 31.8,
-  mouth_width: 49.1,
-  upper_lip: 9.6,
-  lower_lip: 8.3,
-  philtrum: 13.2,
-  chin_length: 42.3,
-  midface: 72.0,
-  lowerface: 73.1,
-  symmetry: 100,
 };
 
 type P = { x: number; y: number; z: number };
@@ -194,15 +166,4 @@ export function faceShape(m: FaceMeasure): { shape: FaceShape; reason: string } 
     return { shape: "둥근형", reason: `가로세로가 비슷하고(${ratio.toFixed(2)}) 턱끝이 둥긂(${Math.round(m.chin_angle)}°)` };
   }
   return { shape: "계란형", reason: `세로/가로 ${ratio.toFixed(2)}, 턱끝 ${Math.round(m.chin_angle)}°로 균형 잡힌 비율` };
-}
-
-/** 평균 대비 몇 % 크거나 작은지 */
-export function versusAverage(key: keyof FaceMeasure, value: number) {
-  const ref = REF[key];
-  if (key.startsWith("eye_tilt") || key === "chin_angle") {
-    const diff = value - ref;
-    return Math.abs(diff) < 1 ? "평균" : `평균보다 ${diff > 0 ? "+" : ""}${diff.toFixed(1)}°`;
-  }
-  const pct = ((value - ref) / ref) * 100;
-  return Math.abs(pct) < 3 ? "평균" : `평균보다 ${pct > 0 ? "+" : ""}${Math.round(pct)}%`;
 }
