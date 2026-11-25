@@ -78,24 +78,22 @@ body {
   .anim-smoke, .anim-flame, .anim-bubble, .anim-shake { animation: none; }
 }
 
-/* 카드 등장 연출 (CardReveal): 카드 공개 영상 → 마지막 장면에서 대기 → 누르면 섬광과 함께 앞면 */
-.reveal-stage { perspective: 1400px; }
-.reveal-back, .reveal-front, .reveal-flash { position: absolute; inset: 0; border-radius: 1rem; overflow: hidden; }
-.reveal-back { animation: reveal-float 0.7s ease-out both; box-shadow: 0 0 50px rgba(236, 208, 156, 0.35); }
-.reveal-back > video, .reveal-back > img, .reveal-front > img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.reveal-flash { pointer-events: none; background: radial-gradient(circle at 50% 50%, #fffaf0 0%, #ffe2a8 35%, rgba(245, 200, 105, 0.6) 60%, transparent 80%); animation: reveal-flash 1.2s ease-out both; }
-/* 섬광이 가장 밝을 때 뒷면은 커지며 사라지고, 앞면이 돌아 들어온다 */
-.reveal-stage[data-revealed] .reveal-back { animation: reveal-back-out 0.5s ease-in both; }
-.reveal-front { animation: reveal-front-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.25s both; }
-@keyframes reveal-float { 0% { opacity: 0; transform: translateY(40px) scale(0.9); } 100% { opacity: 1; transform: none; } }
-@keyframes reveal-back-out { 0% { opacity: 1; transform: none; filter: brightness(1); } 100% { opacity: 0; transform: scale(1.08); filter: brightness(2.2); } }
-@keyframes reveal-front-in { 0% { opacity: 0; transform: rotateY(90deg) scale(0.92); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+/* 카드 등장 연출 (CardReveal): 화면 전체에 카드 공개 영상 → 마지막 장면에서 대기 → 누르면 섬광과 함께 걷히고 앞면 */
+.reveal-overlay { position: fixed; inset: 0; z-index: 50; overflow: hidden; background: #000; cursor: pointer; animation: reveal-overlay-in 0.6s ease-out both; }
+/* 영상은 화면 높이에 맞춰 가운데, 남는 양옆은 같은 영상을 흐리고 어둡게 키워 채운다 */
+.reveal-overlay-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(28px) brightness(0.55); transform: scale(1.15); }
+.reveal-overlay-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.reveal-overlay[data-revealed] { cursor: default; animation: reveal-overlay-out 1.2s ease-in both; }
+.reveal-flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, #fffaf0 0%, #ffe2a8 30%, rgba(245, 200, 105, 0.6) 55%, transparent 80%); animation: reveal-flash 1.2s ease-out both; }
+.reveal-front { position: absolute; inset: 0; border-radius: 1rem; overflow: hidden; animation: reveal-front-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s backwards; }
+.reveal-front > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+@keyframes reveal-overlay-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes reveal-overlay-out { 0%, 30% { opacity: 1; filter: brightness(1); } 100% { opacity: 0; filter: brightness(2); } }
+@keyframes reveal-front-in { 0% { opacity: 0; transform: perspective(1400px) rotateY(90deg) scale(0.92); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 @keyframes reveal-flash { 0% { opacity: 0; transform: scale(0.6); } 25% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.4); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-back, .reveal-stage[data-revealed] .reveal-back { animation: none; }
-  .reveal-stage[data-revealed] .reveal-back { opacity: 0; }
-  .reveal-front { animation: none; }
+  .reveal-overlay, .reveal-overlay[data-revealed], .reveal-front { animation: none; }
   .reveal-flash { display: none; }
 }
 
