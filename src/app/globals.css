@@ -78,23 +78,38 @@ body {
   .anim-smoke, .anim-flame, .anim-bubble, .anim-shake { animation: none; }
 }
 
-/* 카드 등장 연출 (CardReveal): 화면 전체에 카드 공개 영상 → 마지막 장면에서 대기 → 누르면 섬광과 함께 걷히고 앞면 */
-.reveal-overlay { position: fixed; inset: 0; z-index: 50; overflow: hidden; background: #000; cursor: pointer; animation: reveal-overlay-in 0.6s ease-out both; }
-/* 영상은 화면 높이에 맞춰 가운데, 남는 양옆은 같은 영상을 흐리고 어둡게 키워 채운다 */
-.reveal-overlay-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(28px) brightness(0.55); transform: scale(1.15); }
-.reveal-overlay-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.reveal-overlay[data-revealed] { cursor: default; animation: reveal-overlay-out 1.2s ease-in both; }
-.reveal-flash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, #fffaf0 0%, #ffe2a8 30%, rgba(245, 200, 105, 0.6) 55%, transparent 80%); animation: reveal-flash 1.2s ease-out both; }
-.reveal-front { position: absolute; inset: 0; border-radius: 1rem; overflow: hidden; animation: reveal-front-in 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s backwards; }
-.reveal-front > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+/* 카드 등장 연출 (CardReveal): 화면 전체 실시간 연출(revealFx.ts) → 누르면 뒤집혀 앞면 → 연출 화면이 걷히고 제자리에 카드 */
+.reveal-overlay {
+  position: fixed; inset: 0; z-index: 50; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 45%, #2a1a10 0%, #120b08 45%, #050304 100%);
+  animation: reveal-overlay-in 0.5s ease-out both;
+}
+.reveal-overlay[data-closing] { animation: reveal-overlay-out 0.6s ease-in both; }
+.reveal-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* 카드는 화면 가운데 크게. 3D 뒤집기는 이 안의 .reveal-card 에 revealFx.ts 가 직접 건다 */
+.reveal-overlay-card {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+  width: min(46vh, 70vw); aspect-ratio: 100 / 148; perspective: 1600px;
+}
+.reveal-card { position: absolute; inset: 0; transform-style: preserve-3d; opacity: 0; }
+.reveal-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 1rem; overflow: hidden; }
+.reveal-back { box-shadow: 0 0 60px rgba(255, 196, 102, 0.45); }
+.reveal-front { transform: rotateY(180deg); }
+.reveal-front > img, .reveal-settled > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.reveal-hint {
+  position: absolute; left: 0; right: 0; bottom: 6vh; text-align: center;
+  color: #fde7b0; font-size: 1.1rem; letter-spacing: 0.08em; text-shadow: 0 0 12px rgba(255, 196, 102, 0.8);
+  animation: reveal-hint 2.4s ease-in-out 4.5s infinite both;
+}
+.reveal-settled { position: absolute; inset: 0; border-radius: 1rem; overflow: hidden; }
 @keyframes reveal-overlay-in { 0% { opacity: 0; } 100% { opacity: 1; } }
-@keyframes reveal-overlay-out { 0%, 30% { opacity: 1; filter: brightness(1); } 100% { opacity: 0; filter: brightness(2); } }
-@keyframes reveal-front-in { 0% { opacity: 0; transform: perspective(1400px) rotateY(90deg) scale(0.92); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
-@keyframes reveal-flash { 0% { opacity: 0; transform: scale(0.6); } 25% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes reveal-overlay-out { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes reveal-hint { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-overlay, .reveal-overlay[data-revealed], .reveal-front { animation: none; }
-  .reveal-flash { display: none; }
+  .reveal-overlay, .reveal-overlay[data-closing], .reveal-hint { animation: none; }
+  .reveal-card { opacity: 1; }
+  .reveal-fx { display: none; }
 }
 
 /* 인쇄: 화면에는 숨겨 둔 카드 이미지 한 장만 100×148mm 종이에 꽉 차게 찍는다 */
