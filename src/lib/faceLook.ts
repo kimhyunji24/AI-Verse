@@ -2,7 +2,7 @@
  * 얼굴 세부 분석과 동물상 유사도 (faceLook)
  *
  * 역할: MediaPipe 얼굴 랜드마크(468점)에서 눈매·눈 크기·코·광대·턱·입술·인중 등 세부 수치 14개를 재고,
- *       평균 얼굴과 비교한 표준 점수(z)로 바꾼 뒤, 동물상 8가지의 특징 방향과 얼마나 닮았는지(코사인 유사도)를
+ *       평균 얼굴과 비교한 표준 점수(z)로 바꾼 뒤, 동물상 10가지의 특징 방향과 얼마나 닮았는지(코사인 유사도)를
  *       백분율로 낸다. 결과는 "여우상 41%" 같은 재료와 화면의 분석 패널에 쓴다.
  * 비고: 화면 연출용 계산이다. 이미지는 저장하거나 보내지 않고, 백엔드로 가는 값(faceFeatures)도 바꾸지 않는다.
  *       평균값(MEAN)은 MediaPipe 표준 얼굴 모델(canonical_face_model.obj)에서 같은 방식으로 잰 값이다.
@@ -21,8 +21,10 @@ import {
   GiDinosaurRex,
   GiFoxHead,
   GiMonkey,
+  GiMouse,
   GiRabbit,
   GiSittingDog,
+  GiWolfHead,
 } from "react-icons/gi";
 import type { Landmark } from "@/lib/faceFeatures";
 
@@ -190,6 +192,20 @@ export const ANIMALS: Animal[] = [
     color: "#86efac",
     traits: { cheekbone: 1.2, jaw: 0.8, face_length: 0.8, eye_size: -0.8, nose_length: 0.6, brow_gap: -0.5 },
   },
+  {
+    key: "wolf",
+    label: "늑대상",
+    Icon: GiWolfHead,
+    color: "#94a3b8",
+    traits: { eye_tilt: 1, eye_round: -0.8, nose_length: 1, jaw: 0.8, cheekbone: 0.6, brow_gap: -0.6 },
+  },
+  {
+    key: "hamster",
+    label: "햄스터상",
+    Icon: GiMouse,
+    color: "#fdba74",
+    traits: { face_length: -1, mouth_width: -1, nose_length: -0.8, eye_round: 0.8, cheekbone: 0.6, eye_size: 0.3 },
+  },
 ];
 
 export type AnimalScore = { animal: Animal; percent: number };
@@ -197,7 +213,7 @@ export type AnimalScore = { animal: Animal; percent: number };
 export type FaceLook = {
   detail: FaceDetail;
   z: FaceDetail;
-  /** 닮은 순서대로, 8가지 합이 100 */
+  /** 닮은 순서대로, 10가지 합이 100 */
   animals: AnimalScore[];
 };
 
