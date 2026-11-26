@@ -400,7 +400,8 @@ export default function ObservatoryFlow() {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
         })
         .catch((error) => {
-          console.error("자동 인쇄 실패, 인쇄 창으로 대신함", error);
+          // 인쇄 창으로 이어지므로 오류창(개발 화면)을 띄우지 않게 경고로 남긴다
+          console.warn("자동 인쇄 실패, 인쇄 창으로 대신함", error);
           window.print();
         })
         .finally(() => {
