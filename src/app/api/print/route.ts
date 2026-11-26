@@ -12,6 +12,7 @@
  *
  * 수정 이력:
  *   - 2026-11-26 최초 작성
+ *   - 2026-11-26 와이파이와 USB로 둘 다 등록돼 있으면 USB 쪽 CP1500을 고름
  *   - 2026-11-26 Canon SELPHY CP1500을 자동으로 찾아 그 프린터로만 인쇄, 맥은 엽서 여백 없음
  */
 
@@ -52,10 +53,25 @@ try {
 } finally { $img.Dispose() }
 `;
 
-/** macOS·리눅스: 프린터 이름 목록(lpstat -e, 한 줄에 하나)에서 CP1500을 찾는다. -p는 시스템 언어로 나와 쓰지 않는다. */
+/**
+ * macOS·리눅스: 프린터 이름 목록(lpstat -e, 한 줄에 하나)에서 CP1500을 찾는다. -p는 시스템 언어로 나와 쓰지 않는다.
+ * 같은 CP1500이 와이파이와 USB로 둘 다 등록돼 있으면 USB 쪽을 고른다 (와이파이는 이름이 바뀌거나 끊기면 인쇄가 멈춘다).
+ */
 async function findBoothPrinter(): Promise<string | null> {
   const { stdout } = await run("lpstat", ["-e"], { timeout: 10_000 });
-  return stdout.split("\n").map((line) => line.trim()).find((name) => BOOTH_PRINTER.test(name)) ?? null;
+  const names = stdout.split("\n").map((line) => line.trim()).filter((name) => BOOTH_PRINTER.test(name));
+  if (names.length <= 1) return names[0] ?? null;
+  // lpstat -v 한 줄: "<이름>에 대한 기기: <주소>" (가운데 문구는 시스템 언어, 이름은 줄 맨 앞, 주소는 줄 끝)
+  const { stdout: devices } = await run("lpstat", ["-v"], { timeout: 10_000 });
+  for (const line of devices.split("\n")) {
+    if (!/(?:ippusb|usb):\/\/\S*$/.test(line.trim())) continue;
+    // 이름이 다른 이름의 앞부분일 수 있어(CP1500 / CP1500_2) 줄 맨 앞과 가장 길게 맞는 이름을 고른다
+    const name = names
+      .filter((candidate) => line.startsWith(candidate) && !/[A-Za-z0-9_-]/.test(line[candidate.length] ?? ""))
+      .sort((a, b) => b.length - a.length)[0];
+    if (name) return name;
+  }
+  return names[0];
 }
 
 async function printFile(file: string) {
