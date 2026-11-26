@@ -40,11 +40,12 @@ export const QUESTIONS = [
   {
     key: "place",
     title: "캠퍼스에서 제일 좋아하는 곳은?",
+    // 값은 백엔드의 장소 키를 그대로 쓰고 이름만 우리 학교 장소로 바꿨다
     options: [
-      { value: "deep_sea", label: "조용한 연못가 벤치" },
-      { value: "night_sky", label: "밤하늘 보이는 옥상" },
-      { value: "old_library", label: "중앙도서관 열람실" },
-      { value: "neon_city", label: "학교 앞 먹자골목" },
+      { value: "night_sky", label: "학관 앞 벤치" },
+      { value: "neon_city", label: "기숙사 식당" },
+      { value: "old_library", label: "중앙도서관" },
+      { value: "deep_sea", label: "하랑" },
     ],
   },
   {
