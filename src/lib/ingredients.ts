@@ -22,6 +22,14 @@
 import type { IconType } from "react-icons";
 import {
   GiBrain,
+  GiChemicalDrop,
+  GiDesk,
+  GiDoorway,
+  GiGears,
+  GiPalette,
+  GiPodium,
+  GiQuillInk,
+  GiWindow,
   GiBroadsword,
   GiCandleFlame,
   GiCherry,
@@ -139,4 +147,12 @@ export const ANSWER_INGREDIENTS: Record<string, IngredientLook> = {
   book: { Icon: GiSpellBook, label: "손때 묻은 책", color: "#c4b5fd" },
   map: { Icon: GiTreasureMap, label: "보물 지도", color: "#fcd34d" },
   charm: { Icon: GiClover, label: "네잎클로버", color: "#4ade80" },
+  engineering: { Icon: GiGears, label: "밤샘 톱니바퀴", color: "#94a3b8" },
+  humanities: { Icon: GiQuillInk, label: "잉크 깃펜", color: "#c4b5fd" },
+  science: { Icon: GiChemicalDrop, label: "실험실 물약", color: "#5eead4" },
+  arts: { Icon: GiPalette, label: "물감 팔레트", color: "#f9a8d4" },
+  front: { Icon: GiPodium, label: "맨 앞 교탁", color: "#fde68a" },
+  window: { Icon: GiWindow, label: "창가 햇살", color: "#bae6fd" },
+  back: { Icon: GiDesk, label: "뒷자리 책상", color: "#d6b98c" },
+  door: { Icon: GiDoorway, label: "열린 문틈", color: "#a5b4fc" },
 };
