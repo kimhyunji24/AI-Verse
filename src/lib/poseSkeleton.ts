@@ -11,6 +11,7 @@
  *   - 2026-11-22 최초 작성
  *   - 2026-11-22 손가락 관절(손 21점)과 손 모양 코드 추가
  *   - 2026-11-26 머리 원 안에 눈·코·입을 그려 얼굴 방향과 손-얼굴 위치가 그림 모델에 전달되게 함
+ *   - 2026-11-26 그림 모델에 보내는 뼈대는 머리 위치(빈 원)와 손만 그림 (얼굴·몸·팔 선 없음). 화면 오버레이는 그대로
  *   - 2026-11-26 손 모양 모델이 못 알아보면(None·낮은 점수) 손가락 21점으로 직접 판정 (handShape)
  */
 
@@ -77,10 +78,6 @@ export function handShape(hand: Landmark[]): Gesture | null {
 // MediaPipe Pose 랜드마크 번호
 const P = {
   nose: 0,
-  eyeA: 2,
-  eyeB: 5,
-  mouthA: 9,
-  mouthB: 10,
   earA: 7,
   earB: 8,
   shoulderA: 11,
@@ -153,13 +150,29 @@ export function drawPose(
   project: (point: PoseLandmark) => Point,
   lineWidth: number,
   hands: Hand[] = [],
+  // true면 머리 위치와 손만 그린다 (그림 모델에 보내는 뼈대용). 몸·팔 선과 얼굴 표시는 없다.
+  headAndHandsOnly = false,
 ) {
   context.lineCap = "round";
   context.lineJoin = "round";
   context.lineWidth = lineWidth;
   // 손 모델로 손가락을 그릴 때는 포즈 모델의 거친 손 선(손목→엄지·검지·새끼)은 생략한다
   const skipPoseHands = hands.length > 0;
-  for (const [from, to, color] of LIMBS) {
+  // 손가락을 못 잡았으면 손목 자리에 큰 점을 찍어 손 위치만이라도 알린다
+  if (headAndHandsOnly && !skipPoseHands) {
+    for (const [wrist, color] of [
+      [P.wristA, SIDE_A],
+      [P.wristB, SIDE_B],
+    ] as const) {
+      if (!visible(pose[wrist])) continue;
+      const w = project(pose[wrist]);
+      context.fillStyle = color;
+      context.beginPath();
+      context.arc(w.x, w.y, lineWidth * 1.2, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  for (const [from, to, color] of headAndHandsOnly ? [] : LIMBS) {
     if (skipPoseHands && (from === P.wristA || from === P.wristB)) continue;
     const a = pose[from];
     const b = pose[to];
@@ -195,46 +208,33 @@ export function drawPose(
   }
   context.lineWidth = lineWidth;
 
-  // 머리: 얼굴 없이 위치와 크기만 나타내는 원
+  // 머리: 얼굴 없이 위치와 크기만 나타내는 원 (두 귀 가운데). 이 자리에 사물이나 동물 머리가 들어간다.
+  // 눈·코·입을 그리면 그림 모델이 사람 얼굴로 그려 버려서 넣지 않는다. 화면 오버레이에만 코 점을 찍는다.
   const nose = pose[P.nose];
   if (visible(nose)) {
-    const center = project(nose);
+    const nosePoint = project(nose);
     const shoulderA = project(pose[P.shoulderA]);
     const shoulderB = project(pose[P.shoulderB]);
     const shoulderWidth = Math.hypot(shoulderA.x - shoulderB.x, shoulderA.y - shoulderB.y);
     const earA = pose[P.earA];
     const earB = pose[P.earB];
-    const earWidth =
-      visible(earA) && visible(earB)
-        ? Math.hypot(project(earA).x - project(earB).x, project(earA).y - project(earB).y)
-        : 0;
+    const earsVisible = visible(earA) && visible(earB);
+    const earWidth = earsVisible
+      ? Math.hypot(project(earA).x - project(earB).x, project(earA).y - project(earB).y)
+      : 0;
     const radius = Math.max(earWidth * 0.75, shoulderWidth * 0.22);
+    const center = earsVisible
+      ? { x: (project(earA).x + project(earB).x) / 2, y: (project(earA).y + project(earB).y) / 2 }
+      : nosePoint;
     context.strokeStyle = TORSO;
     context.beginPath();
     context.arc(center.x, center.y, radius, 0, Math.PI * 2);
     context.stroke();
-
-    // 얼굴 방향: 눈 두 점, 코 점, 입 선. 원 안에서 어느 쪽으로 쏠렸는지로 고개 돌림·기울기가 보인다
-    context.fillStyle = TORSO;
-    const dot = (point: PoseLandmark, size: number) => {
-      const p = project(point);
+    if (!headAndHandsOnly) {
+      context.fillStyle = TORSO;
       context.beginPath();
-      context.arc(p.x, p.y, size, 0, Math.PI * 2);
+      context.arc(nosePoint.x, nosePoint.y, radius * 0.12, 0, Math.PI * 2);
       context.fill();
-    };
-    for (const eye of [pose[P.eyeA], pose[P.eyeB]]) if (visible(eye)) dot(eye, radius * 0.12);
-    dot(nose, radius * 0.08);
-    const mouthA = pose[P.mouthA];
-    const mouthB = pose[P.mouthB];
-    if (visible(mouthA) && visible(mouthB)) {
-      const a = project(mouthA);
-      const b = project(mouthB);
-      context.lineWidth = Math.max(2, lineWidth * 0.5);
-      context.beginPath();
-      context.moveTo(a.x, a.y);
-      context.lineTo(b.x, b.y);
-      context.stroke();
-      context.lineWidth = lineWidth;
     }
   }
 }
@@ -290,6 +290,8 @@ export function renderSkeletonPng(
     },
     14,
     hands,
+    // 그림 모델에는 머리 위치와 손만 보낸다
+    true,
   );
   return canvas.toDataURL("image/png");
 }

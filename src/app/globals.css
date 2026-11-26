@@ -112,13 +112,14 @@ body {
   .reveal-fx { display: none; }
 }
 
-/* 인쇄: 화면에는 숨겨 둔 카드 이미지 한 장만 100×148mm 종이에 꽉 차게 찍는다 */
+/* 인쇄 창으로 인쇄할 때: 화면에는 숨겨 둔 카드 이미지 한 장만 카드 크기(54×86mm) 종이에 찍는다 */
 .print-card { display: none; }
 @media print {
-  @page { size: 100mm 148mm; margin: 0; }
+  @page { size: 54mm 86mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #fff; }
   body > *:not(.print-card) { display: none !important; }
-  .print-card { display: block; width: 100mm; height: 148mm; }
+  /* 카드 크기 용지(54×86mm)에 테두리까지 전체가 보이게 맞춘다. 프린터가 가장자리를 잘라도 남도록 2mm 안쪽에 둔다 */
+  .print-card { display: block; width: 50mm; height: 82mm; margin: 2mm; object-fit: contain; }
 }
 
 .font-display { font-family: var(--font-gowun-batang), serif; font-weight: 700; }

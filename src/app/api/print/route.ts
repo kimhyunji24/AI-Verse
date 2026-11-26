@@ -6,12 +6,16 @@
  * 비고: Next 서버가 프린터가 연결된 부스 PC에서 돌아가야 한다.
  *       프린터는 연결된 것 중 Canon SELPHY CP1500을 자동으로 찾는다. 못 찾으면 인쇄하지 않고 실패를 돌려준다
  *       (다른 프린터로 잘못 나가지 않게). PRINTER_NAME 을 주면 그 프린터를 쓴다.
- *       맥은 엽서 여백 없음(Postcard.Fullbleed, 100×148mm)으로 보낸다. PRINT_MEDIA 로 바꿀 수 있다.
- *       윈도우는 프린터 드라이버의 기본 용지를 엽서(여백 없음)로 맞춰 둔다.
+ *       용지는 카드 크기(54×86mm)다. 여백 없음(Fullbleed)은 프린터가 용지보다 크게 찍어 카드 테두리가 잘리므로
+ *       여백 있는 인쇄로 카드 전체(테두리 포함)를 용지 안에 맞춘다. 가장자리에 얇은 흰 여백이 생긴다.
+ *       맥은 54x86mm 로 보낸다(PRINT_MEDIA 로 바꿀 수 있다). 윈도우는 드라이버 기본 용지를 카드 크기로 맞춰 둔다.
  *       받는 값은 백엔드의 카드 경로뿐이라 다른 주소의 파일은 인쇄하지 않는다.
  *
  * 수정 이력:
  *   - 2026-11-26 최초 작성
+ *   - 2026-11-26 여백 없음 인쇄에서 테두리가 잘려 여백 있는 카드 크기(54x86mm)로, 윈도우도 가장자리 여유를 둠
+ *   - 2026-11-26 용지를 엽서에서 카드 크기(54×86mm)로, 카드 전체가 보이게 비율 유지해 맞춤
+ *   - 2026-11-26 와이파이와 USB로 둘 다 등록돼 있으면 USB 쪽 CP1500을 고름
  *   - 2026-11-26 Canon SELPHY CP1500을 자동으로 찾아 그 프린터로만 인쇄, 맥은 엽서 여백 없음
  */
 
@@ -47,15 +51,38 @@ try {
   if (-not $doc.PrinterSettings.IsValid) { throw "프린터를 찾을 수 없음: $($doc.PrinterSettings.PrinterName)" }
   $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
   $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
-  $doc.add_PrintPage({ param($s, $e) $e.Graphics.DrawImage($img, $e.PageBounds); $e.HasMorePages = $false })
+  # 비율을 지키며 용지 안에 전체가 들어가게 맞추고 가운데에 둔다 (남는 쪽은 흰 여백)
+  $doc.add_PrintPage({ param($s, $e)
+    $page = $e.PageBounds
+    # 프린터가 가장자리를 조금 잘라 먹어도 테두리가 남도록 4% 안쪽에 그린다
+    $scale = [Math]::Min($page.Width / $img.Width, $page.Height / $img.Height) * 0.96
+    $w = $img.Width * $scale; $h = $img.Height * $scale
+    $e.Graphics.DrawImage($img, [single](($page.Width - $w) / 2), [single](($page.Height - $h) / 2), [single]$w, [single]$h)
+    $e.HasMorePages = $false
+  })
   $doc.Print()
 } finally { $img.Dispose() }
 `;
 
-/** macOS·리눅스: 프린터 이름 목록(lpstat -e, 한 줄에 하나)에서 CP1500을 찾는다. -p는 시스템 언어로 나와 쓰지 않는다. */
+/**
+ * macOS·리눅스: 프린터 이름 목록(lpstat -e, 한 줄에 하나)에서 CP1500을 찾는다. -p는 시스템 언어로 나와 쓰지 않는다.
+ * 같은 CP1500이 와이파이와 USB로 둘 다 등록돼 있으면 USB 쪽을 고른다 (와이파이는 이름이 바뀌거나 끊기면 인쇄가 멈춘다).
+ */
 async function findBoothPrinter(): Promise<string | null> {
   const { stdout } = await run("lpstat", ["-e"], { timeout: 10_000 });
-  return stdout.split("\n").map((line) => line.trim()).find((name) => BOOTH_PRINTER.test(name)) ?? null;
+  const names = stdout.split("\n").map((line) => line.trim()).filter((name) => BOOTH_PRINTER.test(name));
+  if (names.length <= 1) return names[0] ?? null;
+  // lpstat -v 한 줄: "<이름>에 대한 기기: <주소>" (가운데 문구는 시스템 언어, 이름은 줄 맨 앞, 주소는 줄 끝)
+  const { stdout: devices } = await run("lpstat", ["-v"], { timeout: 10_000 });
+  for (const line of devices.split("\n")) {
+    if (!/(?:ippusb|usb):\/\/\S*$/.test(line.trim())) continue;
+    // 이름이 다른 이름의 앞부분일 수 있어(CP1500 / CP1500_2) 줄 맨 앞과 가장 길게 맞는 이름을 고른다
+    const name = names
+      .filter((candidate) => line.startsWith(candidate) && !/[A-Za-z0-9_-]/.test(line[candidate.length] ?? ""))
+      .sort((a, b) => b.length - a.length)[0];
+    if (name) return name;
+  }
+  return names[0];
 }
 
 async function printFile(file: string) {
@@ -68,7 +95,7 @@ async function printFile(file: string) {
   }
   const printer = process.env.PRINTER_NAME || (await findBoothPrinter());
   if (!printer) throw new Error("CP1500 프린터를 찾을 수 없음");
-  const media = process.env.PRINT_MEDIA || "Postcard.Fullbleed";
+  const media = process.env.PRINT_MEDIA || "54x86mm";
   await run("lp", ["-d", printer, "-o", `media=${media}`, "-o", "fit-to-page", file], { timeout: 60_000 });
 }
 
