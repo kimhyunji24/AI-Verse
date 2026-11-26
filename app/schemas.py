@@ -58,11 +58,25 @@ class Answers(BaseModel):
     crisis: Literal["confront", "hide", "trick", "call_friends"]
     power: Literal["read_minds", "stop_time", "fly", "transform"]
     bag: Literal["snack", "book", "map", "charm"]
+    # 대학교 문항 (2026-11-26 추가). 예전 화면이 보내지 않아도 되도록 기본값을 둔다.
+    major: Literal["engineering", "humanities", "science", "arts"] = "humanities"
+    seat: Literal["front", "window", "back", "door"] = "window"
+
+
+# 프론트가 얼굴 랜드마크로 계산한 동물상 (faceLook.ts 의 ANIMALS key와 같다)
+AnimalLookKey = Literal["fox", "cat", "dog", "rabbit", "bear", "monkey", "deer", "dino", "wolf", "hamster"]
+
+
+class AnimalLook(BaseModel):
+    key: AnimalLookKey
+    percent: int = Field(ge=0, le=100)
 
 
 class CharacterRequest(BaseModel):
     features: FaceFeatures
     answers: Answers
+    # 닮은 동물상 상위 몇 개. 동물 캐릭터의 종족을 고르는 데 쓴다. 없으면 동물 풀 전체에서 고른다.
+    animal_looks: list[AnimalLook] = Field(default=[], max_length=10)
 
 
 class Stats(BaseModel):
@@ -92,6 +106,9 @@ class CharacterParameters(BaseModel):
     wish: str
     crisis: str
     lucky_item_type: str
+    # 대학교 문항: 끌리는 단과대와 강의실 자리
+    major: str = ""
+    seat: str = ""
     # 룰로 확정되는 값
     palette: str
     ability: str
@@ -103,12 +120,30 @@ class CharacterParameters(BaseModel):
     base_stats: Stats
     # 이름 수식어 후보 3개(예: 보송보송한). 이름은 "수식어 + 종족" 형식이며 참가자마다 무작위로 뽑는다.
     name_hints: list[str] = []
-    # 의상 템플릿 6종 중 무작위 하나 (예: 빨간 체크무늬 셔츠). 목 아래 사람 몸이 입는다.
+    # 의상 템플릿 20종 중 무작위 하나 (예: 빨간 체크무늬 셔츠). 목 아래 몸이 입는다.
     outfit: str = ""
+    # 소품 24종 중 무작위 하나 (예: 노트북을 한 손에 들고 있음). 종족에 어울리는 동작이 마땅치 않을 때 GPT가 쓴다.
+    prop: str = ""
     # 실제 동물 캐릭터만: 참가자와 닮게 옮길 얼굴 생김새 문구 (인외 캐릭터는 비어 있다)
     face_traits: list[str] = []
     # 동물 캐릭터만: 무작위로 고른 격한 감정 (예: 감격해서 눈물 글썽). 인외 캐릭터는 비어 있다.
     emotion: str = ""
+    # 얼굴에서 가장 두드러진 특징 (예: 멀리 떨어진 두 눈). 고유 능력과 선택 이유에 쓴다.
+    signature_trait: str = ""
+    # 동물 캐릭터만: 가장 닮은 동물상과 비율 (예: 여우상, 41)
+    animal_look: str = ""
+    animal_look_percent: int = 0
+
+
+class StatNames(BaseModel):
+    """능력치 6개의 이름. GPT가 캐릭터 세계관에 맞게 캐릭터마다 새로 짓는다 (예: insight → 물결감지)."""
+
+    insight: str
+    vitality: str
+    resonance: str
+    agility: str
+    willpower: str
+    luck: str
 
 
 class AiDecision(BaseModel):
@@ -118,7 +153,10 @@ class AiDecision(BaseModel):
     element: str
     disposition: str
     stats: Stats
-    reason: str
+    # 능력치 이름 (캐릭터마다 다름)
+    stat_names: StatNames
+    # 종족과 이어지는 물건 하나를 쓰는 동작 (예: 찻주전자 머리 → 손에 든 찻잔에 머리를 기울여 차를 따르는 중)
+    action: str
     name: str
     appearance: str
     backstory: str
@@ -128,7 +166,13 @@ class AiDecision(BaseModel):
 
 class CharacterResponse(AiDecision):
     palette: str
+    # 고유 능력과 선택 이유는 얼굴 패턴 표로 룰이 정한다 (parameters.py)
     ability: str
+    reason: str
+    # 예전 카드 요청에는 없을 수 있다. 없으면 기본 이름(통찰·생명력…)을 쓴다.
+    stat_names: StatNames | None = None
+    # 예전 카드 요청에는 없을 수 있다. 없으면 룰이 고른 소품(parameters.prop)을 쓴다.
+    action: str = ""
     # 어떤 파라미터로 만들어졌는지 체험 화면에 보여주기 위해 함께 반환한다
     parameters: CharacterParameters
 

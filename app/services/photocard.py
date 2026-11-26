@@ -16,6 +16,7 @@
   - 2026-11-22 그림이 뿌옇게 보이던 문제 수정: 그림 전체 무지개 막을 없애고 광택은 가늘고 약하게, 반짝이는 가장자리에만 적게
   - 2026-11-24 팀 결정으로 천체 프레임 템플릿을 걷어내고 이 무지개 홀로 풀아트 템플릿으로 되돌림.
                투명 배경 일러스트가 검게 나오던 문제 수정, 카드 번호를 카드 ID 끝 4자리로, 이름에 종족이 있으면 아랫줄은 속성만 쓰는 것만 유지
+  - 2026-11-26 능력치 이름을 캐릭터마다 GPT가 지은 이름(stat_names)으로 표시
 """
 
 import colorsys
@@ -257,6 +258,9 @@ def compose_card(
     rng = random.Random(seed)
     stats = character.stats.model_dump()
     top_key = max(stats, key=stats.get)
+    # 능력치 이름은 캐릭터마다 GPT가 짓는다. 없거나 비어 있으면 기본 이름을 쓴다.
+    named = character.stat_names.model_dump() if character.stat_names else {}
+    labels = {key: (named.get(key) or "").strip() or default for key, default in STAT_LABELS.items()}
     stars = rarity(character)
     rarity_name, rarity_color = RARITIES[stars]
 
@@ -352,10 +356,11 @@ def compose_card(
     number_right = emblem_c[0] - emblem_r - 20
     _outlined(draw, (number_right, y + 112), number, number_font, anchor="rs")
     label_right = number_right - draw.textlength(number, font=number_font) - 10
-    _outlined(draw, (label_right, y + 104), STAT_LABELS[top_key], label_font, GOLD, stroke=3, anchor="rs")
+    top_label = _fit(draw, labels[top_key], label_font, 220)
+    _outlined(draw, (label_right, y + 104), top_label, label_font, GOLD, stroke=3, anchor="rs")
 
     name_font = _font(80, 900)
-    name_room = label_right - draw.textlength(STAT_LABELS[top_key], font=label_font) - PAD - 24
+    name_room = label_right - draw.textlength(top_label, font=label_font) - PAD - 24
     _outlined(draw, (PAD, y + 120), _fit(draw, character.name, name_font, name_room), name_font, stroke=6, anchor="ls")
     _outlined(
         draw,
@@ -410,7 +415,9 @@ def compose_card(
     # 능력치: 유리 칸 6개
     gap = 12
     cell = (CONTENT - gap * 5) / 6
-    for index, (key, label) in enumerate(STAT_LABELS.items()):
+    stat_font = _font(22, 700)
+    for index, key in enumerate(STAT_LABELS):
+        label = _fit(draw, labels[key], stat_font, cell - 12)
         x0 = PAD + index * (cell + gap)
         highlight = key == top_key
         draw.rounded_rectangle(
@@ -420,7 +427,7 @@ def compose_card(
             outline=(*GOLD, 255) if highlight else (255, 255, 255, 70),
             width=3 if highlight else 2,
         )
-        draw.text((x0 + cell / 2, y + 14), label, font=_font(22, 700), fill=(210, 205, 235), anchor="ma")
+        draw.text((x0 + cell / 2, y + 14), label, font=stat_font, fill=(210, 205, 235), anchor="ma")
         draw.text(
             (x0 + cell / 2, y + 44), str(stats[key]), font=_font(38, 900), fill=GOLD if highlight else WHITE, anchor="ma"
         )

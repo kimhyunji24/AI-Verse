@@ -20,6 +20,8 @@
   - 2026-11-22 90년대 사진관 프로필 사진 스타일로 변경: 머리만 바뀐 사람 몸, 의상 템플릿, 우주·무지개 레이저 배경 고정, 근엄한 표정
   - 2026-11-22 동물 캐릭터는 고정 프롬프트(2등신 찹쌀떡 몸, 손그림 갈색 선, 파스텔)로 그리고 격한 감정과
               설문 장소에 맞춘 단순한 배경을 넣도록 변경. 사물 머리 캐릭터는 사진관 스타일 그대로.
+  - 2026-11-26 종족과 이어지는 동작(action, 없으면 소품 prop)을 프롬프트에 추가, 뼈대의 눈·코·입으로 얼굴 방향과 손-얼굴 위치를 맞추도록 지시
+  - 2026-11-26 동물 캐릭터가 손 모양(브이 등)을 무시하고 주먹으로 그려지던 문제: 손 모양을 영어로 최우선 지시
 """
 
 import base64
@@ -61,10 +63,10 @@ ANIMAL_STYLE = """[Character Design & Anatomy]
 EMOTION_TEXT = dict(EMOTIONS)
 # 설문 장소(realm 문구) -> 동물 캐릭터 배경
 ANIMAL_BACKGROUNDS = {
-    REALMS["deep_sea"]: "a cozy, simple pastel underwater scene with a few bubbles and seaweed",
-    REALMS["night_sky"]: "a cozy, simple pastel night sky with a few stars",
-    REALMS["old_library"]: "a cozy, simple pastel corner of an old library with a few books",
-    REALMS["neon_city"]: "a cozy, simple pastel city street at dusk with a few soft glowing signs",
+    REALMS["deep_sea"]: "a cozy, simple pastel campus cafe with a coffee counter and a few warm lamps",
+    REALMS["night_sky"]: "a cozy, simple pastel campus bench under a starry night sky with a few trees",
+    REALMS["old_library"]: "a cozy, simple pastel corner of a big library with tall bookshelves",
+    REALMS["neon_city"]: "a cozy, simple pastel dormitory cafeteria with steaming rice bowls on trays",
 }
 
 
@@ -81,8 +83,10 @@ class IllustrationError(Exception):
 
 POSE_INSTRUCTIONS = (
     "첨부한 그림은 참가자가 의자에 앉아 취한 상반신 자세를 흰 바탕에 막대 뼈대로 나타낸 것이다. "
-    "둥근 원은 머리, 굵은 선은 어깨·팔·몸통, 가는 선과 점은 손가락 관절이다. 캐릭터가 이 자세를 그대로 따르게 그린다: "
-    "어깨 기울기, 양팔과 손의 높이와 방향, 손가락을 펴고 접은 모양, 고개 기울기를 맞춘다. 왼쪽과 오른쪽도 그림 그대로 둔다. "
+    "둥근 원은 머리이고, 원 안의 두 점은 눈, 가운데 점은 코, 짧은 선은 입이다. 굵은 선은 어깨·팔·몸통, 가는 선과 점은 손가락 관절이다. "
+    "캐릭터가 이 자세를 그대로 따르게 그린다: 얼굴이 향한 방향(눈·코가 원의 어느 쪽에 있는지)과 고개 기울기, "
+    "몸이 화면의 어느 쪽으로 치우치거나 기울었는지, 어깨 기울기, 양팔과 손의 높이와 방향, 손가락을 펴고 접은 모양을 맞춘다. "
+    "특히 손이 얼굴의 어느 쪽, 어느 높이에 있는지(볼 옆, 턱 아래, 머리 위, 얼굴 앞 등)를 정확히 맞춘다. 왼쪽과 오른쪽도 그림 그대로 둔다. "
     "뼈대의 선, 점, 흰 바탕은 결과 그림에 남기지 않는다."
 )
 
@@ -99,6 +103,27 @@ GESTURE_TEXT = {
 }
 SIDE_TEXT = {"left": "그림의 왼쪽 손", "right": "그림의 오른쪽 손"}
 
+# 동물 캐릭터용 영어 문장. 동물 화풍은 "손가락 없는 뭉툭한 손"이 기본이라, 손 모양은 영어로 따로 세게 지시해야 그려진다.
+GESTURE_TEXT_EN = {
+    "Closed_Fist": "a closed fist",
+    "Open_Palm": "an open palm with all five fingers spread wide",
+    "Pointing_Up": "only the index finger raised, pointing up",
+    "Thumb_Down": "a thumbs-down (only the thumb out, pointing down)",
+    "Thumb_Up": "a thumbs-up (only the thumb raised)",
+    "Victory": "a V sign / peace sign: index and middle fingers raised and spread apart in a clear V, other fingers folded",
+    "ILoveYou": "the 'I love you' sign: thumb, index finger and pinky raised, middle and ring fingers folded",
+}
+SIDE_TEXT_EN = {"left": "the paw on the LEFT side of the image", "right": "the paw on the RIGHT side of the image"}
+
+
+def gesture_line_en(hand_gestures: list[HandGesture]) -> str:
+    parts = [f"{SIDE_TEXT_EN[hand.side]} makes {GESTURE_TEXT_EN[hand.gesture]}" for hand in hand_gestures]
+    return (
+        f"HAND SIGN (top priority, must be clearly readable at a glance): {'; '.join(parts)}. "
+        "For this hand sign, give the paw small but distinct fingers with the correct finger count, "
+        "raise the paw beside the face so it is not hidden, and do NOT draw a fist or a mitten paw instead."
+    )
+
 
 def gesture_line(hand_gestures: list[HandGesture]) -> str:
     parts = [f"{SIDE_TEXT[hand.side]}은 {GESTURE_TEXT[hand.gesture]}" for hand in hand_gestures]
@@ -112,6 +137,7 @@ def build_prompt(
     hand_gestures: list[HandGesture] | None = None,
 ) -> str:
     parameters = character.parameters
+    action = character.action or parameters.prop
     # parameters.character_type 에는 키(nonhuman)가 아니라 설명 문구가 들어 있다
     if parameters.character_type != CHARACTER_TYPES["nonhuman"]:
         return _animal_prompt(character, with_pose=with_pose, hand_gestures=hand_gestures)
@@ -121,7 +147,8 @@ def build_prompt(
             f"주인공: {NONHUMAN_STYLE}",
             f"사진 스타일: {PORTRAIT}",
             *([f"옷: {parameters.outfit}."] if parameters.outfit else []),
-            f"캐릭터: {character.race}, 속성은 {character.element}.",
+            *([f"동작과 소품: {action}. 손 모양이 있으면 그 손 모양을 가리지 않게 다른 손으로 한다."] if action else []),
+            f"캐릭터: 머리 자리에 {character.race}이(가) 달려 있다. 속성은 {character.element}.",
             f"외형: {character.appearance}",
             f"배경: {BACKGROUND}",
             "구도: 가슴 위 상반신이 화면 가운데에 크게, 정면 증명사진처럼. 머리 위로 화면의 약 15%를 비워 두고, "
@@ -141,6 +168,7 @@ def _animal_prompt(
     hand_gestures: list[HandGesture] | None,
 ) -> str:
     parameters = character.parameters
+    action = character.action or parameters.prop
     emotion = EMOTION_TEXT.get(parameters.emotion)
     background = ANIMAL_BACKGROUNDS.get(parameters.realm, "a cozy, simple pastel room")
     return "\n".join(
@@ -149,6 +177,11 @@ def _animal_prompt(
             ANIMAL_STYLE,
             f"Character: a {character.race} (Korean name of the animal), wearing {parameters.outfit or 'a simple outfit'}.",
             f"Appearance notes (Korean): {character.appearance}",
+            *(
+                [f"Action with a prop (Korean): {action}. If a hand sign is given, do this with the other paw so the sign stays visible."]
+                if action
+                else []
+            ),
             *(
                 [f"Face traits to reflect (Korean): {', '.join(parameters.face_traits)}."]
                 if parameters.face_traits
@@ -160,7 +193,7 @@ def _animal_prompt(
                 else ["Expression: MAXIMUM EMOTION, pick one strong feeling and exaggerate it as much as possible."]
             ),
             *([f"Pose (Korean): {POSE_INSTRUCTIONS}"] if with_pose else []),
-            *([f"Hands (Korean): {gesture_line(hand_gestures)} Keep the stubby hands simple but readable."] if hand_gestures else []),
+            *([gesture_line_en(hand_gestures), f"Hands (Korean): {gesture_line(hand_gestures)}"] if hand_gestures else []),
             f"Background: {background}, hand-drawn picture-book style. Keep it soft and secondary to the character.",
             "Composition: one character only, full body, centered and large, ears, tail and feet not cut off, "
             "about 15% empty space above the head.",

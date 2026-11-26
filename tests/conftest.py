@@ -57,7 +57,15 @@ def _parse_multipart(content_type: str, raw: bytes) -> dict:
     return fields
 
 STORY = {
-    "reason": "달빛 조각이 먼저 끓어올랐다.",
+    "action": "한 손에 든 찻잔에 머리를 기울여 차를 따르는 중",
+    "stat_names": {
+        "insight": "물결감지",
+        "vitality": "끈기",
+        "resonance": "메아리",
+        "agility": "헤엄",
+        "willpower": "버팀",
+        "luck": "진주운",
+    },
     "name": "루미",
     "appearance": "푸른 빛을 내는 지느러미를 가졌다.",
     "backstory": "심연에서 태어났다.",

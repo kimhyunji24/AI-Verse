@@ -228,7 +228,8 @@ def test_animal_background_follows_place(client, openai_server):
     character = make_character(client, character_type="animal", place="deep_sea")
     photocard(client, character)
     [request] = image_requests(openai_server)
-    assert "underwater" in request["prompt"]
+    # deep_sea 키는 이제 교내 카페(하랑)
+    assert "campus cafe" in request["prompt"]
 
 
 def test_nonhuman_keeps_studio_portrait(client, openai_server):
