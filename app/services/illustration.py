@@ -148,7 +148,7 @@ def build_prompt(
             f"사진 스타일: {PORTRAIT}",
             *([f"옷: {parameters.outfit}."] if parameters.outfit else []),
             *([f"동작과 소품: {action}. 손 모양이 있으면 그 손 모양을 가리지 않게 다른 손으로 한다."] if action else []),
-            f"캐릭터: {character.race}, 속성은 {character.element}.",
+            f"캐릭터: 머리 자리에 {character.race}이(가) 달려 있다. 속성은 {character.element}.",
             f"외형: {character.appearance}",
             f"배경: {BACKGROUND}",
             "구도: 가슴 위 상반신이 화면 가운데에 크게, 정면 증명사진처럼. 머리 위로 화면의 약 15%를 비워 두고, "

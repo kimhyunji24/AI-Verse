@@ -219,7 +219,8 @@ def test_character_type_changes_candidates_and_is_sent_to_ai(client, openai_serv
     assert set(nonhuman["race_candidates"]).isdisjoint(animal["race_candidates"])
     assert "실제 동물" in openai_server.requests[1]["input"]
     assert "머리가 사물인" in openai_server.requests[0]["input"]
-    assert all("머리" in race for race in nonhuman["race_candidates"])
+    # 사물 머리 종족은 사물 이름만 쓴다 (예: 토스터)
+    assert all(not race.endswith("머리") for race in nonhuman["race_candidates"])
 
 
 # 하이브리드: 룰의 재료와 GPT의 결정
