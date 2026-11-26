@@ -116,7 +116,7 @@ def test_response_has_every_card_field(client, openai_server):
 
 
 # 무작위로 뽑는 재료. 같은 입력이어도 매번 달라진다.
-RANDOM_FIELDS = ("name_hints", "outfit", "emotion")
+RANDOM_FIELDS = ("name_hints", "outfit", "emotion", "prop", "race_candidates")
 
 
 def test_same_input_gives_same_rule_result_except_random_picks(client, openai_server):
@@ -140,7 +140,7 @@ def test_every_answer_option_is_accepted(client, openai_server, question, value)
 def test_boundary_values_are_accepted(client, openai_server, name, side):
     data = create(client, features={name: FEATURE_BOUNDS[name][side]})
     assert_valid_stats(data["stats"])
-    assert len(set(data["parameters"]["race_candidates"])) == 3
+    assert len(data["parameters"]["race_candidates"]) == 1
     assert len(set(data["parameters"]["element_candidates"])) == 3
 
 
@@ -173,10 +173,12 @@ def test_scores_are_between_0_and_1_and_exclude_head_pose(client, openai_server)
     assert all(0 <= value <= 1 for value in scores.values())
 
 
-def test_face_shape_changes_race_candidates(client, openai_server):
-    wide = create(client, features={"face_aspect_ratio": 1.0})["parameters"]["race_candidates"]
-    long = create(client, features={"face_aspect_ratio": 1.6})["parameters"]["race_candidates"]
-    assert wide[0] != long[0]
+def test_object_head_is_random_from_the_pool(client, openai_server):
+    from app.services.parameters import OBJECT_HEADS, RACE_ACTIONS
+
+    heads = {create(client)["parameters"]["race_candidates"][0] for _ in range(12)}
+    assert heads <= set(OBJECT_HEADS) and len(heads) > 1
+    assert all(head in RACE_ACTIONS for head in OBJECT_HEADS)
 
 
 def test_eye_gap_changes_palette(client, openai_server):
@@ -234,7 +236,7 @@ def test_ai_choice_within_candidates_is_used(client, openai_server):
 
 
 def test_ai_result_is_used_as_is(client, openai_server):
-    """후보 밖의 값이나 범위를 넘는 능력치도 룰이 고치지 않는다"""
+    """후보 밖의 속성·성향이나 범위를 넘는 능력치도 룰이 고치지 않는다. 종족만은 룰이 고른 것으로 되돌린다."""
     stats = {"insight": 90, "vitality": 10, "resonance": 60, "agility": 40, "willpower": 70, "luck": 30}
     openai_server.choose = lambda parameters: {
         **openai_server.first_candidates(parameters),
@@ -244,7 +246,7 @@ def test_ai_result_is_used_as_is(client, openai_server):
         "stats": stats,
     }
     data = create(client)
-    assert data["race"] == "새로 지은 종족"
+    assert data["race"] == data["parameters"]["race_candidates"][0]
     assert data["element"] == "새 속성"
     assert data["disposition"] == "새로 지은 성향"
     assert data["stats"] == stats
@@ -465,16 +467,33 @@ def test_name_is_assembled_from_a_hint_and_the_race(client, openai_server):
         assert data["name"] in {f"{hint} {race}" for hint in hints}, data["name"]
 
 
-OUTFIT_WORDS = ("체크무늬 셔츠", "공주 드레스", "양복", "수면 잠옷", "한복", "롱패딩")
+def test_outfit_is_one_of_the_templates_and_random(client, openai_server):
+    from app.services.parameters import OUTFITS
 
-
-def test_outfit_is_one_of_six_templates_and_random(client, openai_server):
     outfits = {create(client)["parameters"]["outfit"] for _ in range(12)}
-    for outfit in outfits:
-        assert sum(word in outfit for word in OUTFIT_WORDS) == 1, outfit
+    assert len(OUTFITS) == 20
+    assert outfits <= set(OUTFITS.values())
     # 같은 입력이어도 매번 무작위로 고른다
     assert len(outfits) > 1
     assert "outfit" in openai_server.requests[0]["instructions"]
+
+
+def test_known_race_uses_its_fixed_action(client, openai_server):
+    # 가짜 GPT는 첫 후보 종족을 고르고 STORY의 동작을 쓰지만, 표에 있는 종족이면 정해 둔 동작으로 바뀐다
+    from app.services.parameters import RACE_ACTIONS
+
+    result = create(client, answers={"character_type": "animal"}, animal_looks=[{"key": "hamster", "percent": 40}])
+    assert result["action"] == RACE_ACTIONS[result["race"]]
+
+
+def test_prop_is_random_and_reaches_the_illustration_prompt(client, openai_server):
+    from app.services.parameters import PROPS
+
+    props = {create(client)["parameters"]["prop"] for _ in range(12)}
+    assert props <= set(PROPS) and len(props) > 1
+    # 소품은 GPT에 보내지 않는다 (종족과 이어지는 동작을 쓰게 하려고)
+    assert '"prop"' not in openai_server.requests[0]["input"]
+    assert "동작(action)" in openai_server.requests[0]["instructions"]
 
 
 def test_animal_gets_a_random_emotion_nonhuman_does_not(client, openai_server):

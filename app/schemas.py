@@ -114,8 +114,10 @@ class CharacterParameters(BaseModel):
     base_stats: Stats
     # 이름 수식어 후보 3개(예: 보송보송한). 이름은 "수식어 + 종족" 형식이며 참가자마다 무작위로 뽑는다.
     name_hints: list[str] = []
-    # 의상 템플릿 6종 중 무작위 하나 (예: 빨간 체크무늬 셔츠). 목 아래 사람 몸이 입는다.
+    # 의상 템플릿 20종 중 무작위 하나 (예: 빨간 체크무늬 셔츠). 목 아래 몸이 입는다.
     outfit: str = ""
+    # 소품 24종 중 무작위 하나 (예: 노트북을 한 손에 들고 있음). 종족에 어울리는 동작이 마땅치 않을 때 GPT가 쓴다.
+    prop: str = ""
     # 실제 동물 캐릭터만: 참가자와 닮게 옮길 얼굴 생김새 문구 (인외 캐릭터는 비어 있다)
     face_traits: list[str] = []
     # 동물 캐릭터만: 무작위로 고른 격한 감정 (예: 감격해서 눈물 글썽). 인외 캐릭터는 비어 있다.
@@ -147,6 +149,8 @@ class AiDecision(BaseModel):
     stats: Stats
     # 능력치 이름 (캐릭터마다 다름)
     stat_names: StatNames
+    # 종족과 이어지는 물건 하나를 쓰는 동작 (예: 찻주전자 머리 → 손에 든 찻잔에 머리를 기울여 차를 따르는 중)
+    action: str
     name: str
     appearance: str
     backstory: str
@@ -161,6 +165,8 @@ class CharacterResponse(AiDecision):
     reason: str
     # 예전 카드 요청에는 없을 수 있다. 없으면 기본 이름(통찰·생명력…)을 쓴다.
     stat_names: StatNames | None = None
+    # 예전 카드 요청에는 없을 수 있다. 없으면 룰이 고른 소품(parameters.prop)을 쓴다.
+    action: str = ""
     # 어떤 파라미터로 만들어졌는지 체험 화면에 보여주기 위해 함께 반환한다
     parameters: CharacterParameters
 

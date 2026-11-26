@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas import CharacterRequest, CharacterResponse
 from app.services.ai_character import CharacterAiError, decide_character
-from app.services.parameters import CHARACTER_TYPES, build_parameters, build_reason
+from app.services.parameters import RACE_ACTIONS, build_parameters, build_reason
 
 router = APIRouter()
 
@@ -44,9 +44,10 @@ def create_character(req: CharacterRequest):
             status_code=503 if error.retryable else 500,
             detail={"message": str(error), "retryable": error.retryable},
         ) from error
-    # 동물 종족은 동물상으로 룰이 고른 하나다. 모델이 다른 동물을 쓰면 되돌린다.
-    if parameters.character_type == CHARACTER_TYPES["animal"]:
-        decision.race = parameters.race_candidates[0]
+    # 종족은 룰이 고른 하나다 (동물: 동물상 풀에서, 사물 머리: 전체 풀에서 무작위). 모델이 바꾸거나 꾸밈말을 붙이면 되돌린다.
+    decision.race = parameters.race_candidates[0]
+    # 표에 있는 종족은 정해 둔 동작을 쓴다 (GPT가 장소·설정에 끌려 엉뚱한 물건을 고르는 것을 막는다)
+    decision.action = RACE_ACTIONS.get(decision.race, decision.action)
     _settle_name(decision, parameters.name_hints)
     return CharacterResponse(
         **decision.model_dump(),

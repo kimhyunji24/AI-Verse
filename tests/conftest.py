@@ -57,6 +57,7 @@ def _parse_multipart(content_type: str, raw: bytes) -> dict:
     return fields
 
 STORY = {
+    "action": "한 손에 든 찻잔에 머리를 기울여 차를 따르는 중",
     "stat_names": {
         "insight": "물결감지",
         "vitality": "끈기",
