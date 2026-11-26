@@ -18,6 +18,8 @@
  *   - 2026-11-22 캐릭터 유형 '애니메이션 캐릭터'를 '실제 동물'로 교체 (값 anime → animal)
  *   - 2026-11-22 캐릭터 유형 표시 이름을 '실제 동물'에서 '동물 머리'로 변경
  *   - 2026-11-24 질문·선택지 화면 문구 수정 (내부 값은 그대로)
+ *   - 2026-11-26 설문을 대학교 생활 장면으로 바꾸고 단과대·강의실 자리 문항 추가 (10문항)
+ *   - 2026-11-26 닮은 동물상(animal_looks)을 캐릭터 요청에 함께 보냄, 능력치 이름(stat_names) 타입 추가
  */
 
 import type { FaceFeatures } from "@/lib/faceFeatures";
@@ -25,6 +27,7 @@ import type { HandGesture } from "@/lib/poseSkeleton";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// 질문은 대학교 생활 장면으로 묻는다. 값(value)은 백엔드 schemas.py 의 Answers 와 같아야 한다.
 export const QUESTIONS = [
   {
     key: "character_type",
@@ -36,71 +39,92 @@ export const QUESTIONS = [
   },
   {
     key: "place",
-    title: "가장 끌리는 곳은 어디인가요?",
+    title: "캠퍼스에서 제일 좋아하는 곳은?",
+    // 값은 백엔드의 장소 키를 그대로 쓰고 이름만 우리 학교 장소로 바꿨다
     options: [
-      { value: "deep_sea", label: "깊은 바다" },
-      { value: "night_sky", label: "밤하늘" },
-      { value: "old_library", label: "오래된 도서관" },
-      { value: "neon_city", label: "네온 도시" },
+      { value: "night_sky", label: "학관 앞 벤치" },
+      { value: "neon_city", label: "기숙사 식당" },
+      { value: "old_library", label: "중앙도서관" },
+      { value: "deep_sea", label: "하랑" },
+    ],
+  },
+  {
+    key: "major",
+    title: "어느 단과대 기운이 끌리나요?",
+    options: [
+      { value: "engineering", label: "밤샘 코딩 공대" },
+      { value: "humanities", label: "토론 좋아 인문대" },
+      { value: "science", label: "실험실 자연대" },
+      { value: "arts", label: "작업실 예체능" },
+    ],
+  },
+  {
+    key: "seat",
+    title: "강의실에 들어가면 어디에 앉나요?",
+    options: [
+      { value: "front", label: "맨 앞 가운데" },
+      { value: "window", label: "창가 자리" },
+      { value: "back", label: "맨 뒷자리" },
+      { value: "door", label: "문 바로 옆" },
     ],
   },
   {
     key: "companion",
-    title: "모험을 떠난다면 누구와 함께할까요?",
+    title: "팀플을 하게 된다면?",
     options: [
-      { value: "alone", label: "혼자서" },
-      { value: "one_friend", label: "단짝 한 명과" },
-      { value: "crowd", label: "여럿이 함께" },
-    ],
-  },
-  {
-    key: "wish_2027",
-    title: "2027년에 가장 바라는 것은?",
-    options: [
-      { value: "adventure", label: "새로운 모험" },
-      { value: "rest", label: "충분한 쉼" },
-      { value: "growth", label: "한 뼘의 성장" },
-      { value: "connection", label: "소중한 사람들" },
+      { value: "alone", label: "그냥 혼자 다 한다" },
+      { value: "one_friend", label: "믿는 단짝 한 명과" },
+      { value: "crowd", label: "다 같이 역할 나눠서" },
     ],
   },
   {
     key: "time_of_day",
-    title: "가장 좋아하는 시간은 언제인가요?",
+    title: "과제가 제일 잘 되는 시간은?",
     options: [
-      { value: "dawn", label: "새벽" },
-      { value: "noon", label: "한낮" },
-      { value: "sunset", label: "노을 질 때" },
-      { value: "midnight", label: "한밤" },
+      { value: "dawn", label: "해 뜨기 전 새벽" },
+      { value: "noon", label: "공강 낮 시간" },
+      { value: "sunset", label: "수업 끝난 해 질 녘" },
+      { value: "midnight", label: "마감 직전 한밤" },
     ],
   },
   {
     key: "crisis",
-    title: "곤란한 일이 생기면 어떻게 할까요?",
+    title: "시험 전날인데 하나도 안 봤다면?",
     options: [
-      { value: "confront", label: "부딪혀 본다" },
-      { value: "hide", label: "잠깐 숨는다" },
-      { value: "trick", label: "꾀를 낸다" },
-      { value: "call_friends", label: "동료를 부른다" },
+      { value: "confront", label: "밤새서 정면 돌파" },
+      { value: "hide", label: "일단 자고 내일의 나에게" },
+      { value: "trick", label: "요약본부터 구한다" },
+      { value: "call_friends", label: "스터디 단톡방 소환" },
     ],
   },
   {
     key: "power",
-    title: "하나만 가질 수 있다면 어떤 힘을 고를까요?",
+    title: "학교생활에 딱 하나 초능력이 생긴다면?",
     options: [
-      { value: "read_minds", label: "마음 읽기" },
-      { value: "stop_time", label: "시간 멈추기" },
-      { value: "fly", label: "하늘 날기" },
-      { value: "transform", label: "변신" },
+      { value: "read_minds", label: "교수님 출제 의도 읽기" },
+      { value: "stop_time", label: "마감 1분 전 시간 멈추기" },
+      { value: "fly", label: "1교시 강의실로 날아가기" },
+      { value: "transform", label: "변신해서 다른 과 수업 듣기" },
     ],
   },
   {
     key: "bag",
-    title: "여행 가방에 꼭 넣는 것은?",
+    title: "가방에 꼭 들어 있는 것은?",
     options: [
-      { value: "snack", label: "간식" },
-      { value: "book", label: "책" },
-      { value: "map", label: "지도" },
-      { value: "charm", label: "부적" },
+      { value: "snack", label: "당 충전 간식" },
+      { value: "book", label: "두꺼운 전공책" },
+      { value: "map", label: "캠퍼스 지도와 시간표" },
+      { value: "charm", label: "학점 부적" },
+    ],
+  },
+  {
+    key: "wish_2027",
+    title: "2027년 학교생활에서 가장 바라는 것은?",
+    options: [
+      { value: "adventure", label: "교환학생 같은 새 도전" },
+      { value: "rest", label: "공강 많은 꿀 시간표" },
+      { value: "growth", label: "학점·실력 한 단계 업" },
+      { value: "connection", label: "좋은 사람들과의 추억" },
     ],
   },
 ] as const;
@@ -114,6 +138,8 @@ export type Answers = {
   crisis: string;
   power: string;
   bag: string;
+  major: string;
+  seat: string;
 };
 
 export type Stats = {
@@ -125,6 +151,12 @@ export type Stats = {
   luck: number;
 };
 
+/** 능력치 이름. 캐릭터마다 GPT가 짓는다 (예: insight → 물결감지) */
+export type StatNames = Record<keyof Stats, string>;
+
+/** 닮은 동물상 (faceLook.ts 의 ANIMALS key). 동물 캐릭터의 종족을 고르는 데 쓴다. */
+export type AnimalLook = { key: string; percent: number };
+
 export type Character = {
   name: string;
   race: string;
@@ -134,6 +166,8 @@ export type Character = {
   palette: string;
   ability: string;
   stats: Stats;
+  stat_names?: StatNames;
+  /** 고유 능력과 선택 이유는 백엔드가 얼굴 패턴 표로 정한다 */
   reason: string;
   backstory: string;
   lucky_item: string;
@@ -184,8 +218,13 @@ async function post<T>(path: string, body: unknown, fallback: string): Promise<T
 export function createCharacter(
   features: FaceFeatures,
   answers: Answers,
+  animalLooks: AnimalLook[] = [],
 ): Promise<Character> {
-  return post("/api/character", { features, answers }, "캐릭터 생성에 실패했어요");
+  return post(
+    "/api/character",
+    { features, answers, animal_looks: animalLooks },
+    "캐릭터 생성에 실패했어요",
+  );
 }
 
 /**

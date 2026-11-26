@@ -2,15 +2,20 @@
  * 마녀 항아리 (Cauldron)
  *
  * 역할: 불 위의 항아리와 연기를 그린다. 들어온 재료가 위에서 떨어져 빠지고, 상태에 따라 끓는 정도가 달라진다.
- * 비고: 이미지 파일 없이 SVG와 CSS 애니메이션(globals.css)으로 만들었다.
+ * 비고: 솥은 3D 모델(CauldronModel, public/models/cauldron.glb)로 그린다. 모델을 불러오는 중이거나 못 불러오면
+ *       예전처럼 SVG 솥을 보여 준다. 불·연기·떨어지는 재료는 SVG와 CSS 애니메이션(globals.css)이다.
  *       mood: idle 잔잔함, charging 버튼을 누르는 중, boiling 생성 중
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
  *   - 2026-11-03 재료를 이모지 대신 아이콘으로 표시
+ *   - 2026-11-26 솥을 3D 모델로 교체 (못 불러오면 SVG 솥)
  */
 
-import type { CSSProperties } from "react";
+"use client";
+
+import { type CSSProperties, useState } from "react";
+import CauldronModel, { type ModelStatus } from "@/components/CauldronModel";
 import type { Ingredient } from "@/lib/ingredients";
 
 export type CauldronMood = "idle" | "charging" | "boiling";
@@ -40,6 +45,8 @@ export default function Cauldron({
   ingredients: Ingredient[];
 }) {
   const active = mood !== "idle";
+  const [model, setModel] = useState<ModelStatus>("loading");
+  const show3d = model === "ready";
   const smokeSpeed = mood === "boiling" ? "2s" : mood === "charging" ? "2.8s" : "4.5s";
 
   return (
@@ -77,7 +84,7 @@ export default function Cauldron({
 
       <svg
         viewBox="0 0 400 400"
-        className={`relative h-full w-full ${active ? "anim-shake" : ""}`}
+        className={`relative h-full w-full ${active && !show3d ? "anim-shake" : ""}`}
       >
         <defs>
           <radialGradient id="pot" cx="35%" cy="30%" r="80%">
@@ -104,7 +111,9 @@ export default function Cauldron({
           <rect x="105" y="384" width="190" height="14" rx="7" fill="#78350f" transform="rotate(5 200 390)" />
         </g>
 
-        {/* 항아리 */}
+        {/* 항아리: 3D 모델이 뜨면 SVG 항아리는 숨긴다 */}
+        {!show3d && (
+        <g>
         <path d="M58 200 q-30 -8 -30 22 q0 22 28 20" fill="none" stroke="#27272a" strokeWidth="11" />
         <path d="M342 200 q30 -8 30 22 q0 22 -28 20" fill="none" stroke="#27272a" strokeWidth="11" />
         <path d="M62 178 Q30 330 130 350 L270 350 Q370 330 338 178 Z" fill="url(#pot)" />
@@ -127,7 +136,16 @@ export default function Cauldron({
             }}
           />
         ))}
+        </g>
+        )}
       </svg>
+
+      {/* 3D 솥은 불꽃 위에 겹쳐 솥 몸통이 불꽃을 가리게 한다 */}
+      {model !== "failed" && (
+        <div className={`absolute inset-0 transition-opacity duration-700 ${show3d ? "opacity-100" : "opacity-0"}`}>
+          <CauldronModel mood={mood} onStatus={setModel} />
+        </div>
+      )}
     </div>
   );
 }

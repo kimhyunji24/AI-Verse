@@ -10,6 +10,7 @@
  *   - 2026-11-22 최초 작성
  *   - 2026-11-22 손가락과 손 모양을 잡는 GestureRecognizer 추가
  *   - 2026-11-26 wasm·모델을 CDN 대신 public/mediapipe/ 에서 불러오도록 변경
+ *   - 2026-11-26 손 모양 모델이 못 알아본 손은 손가락 점으로 직접 판정 (handShape)
  */
 
 "use client";
@@ -17,7 +18,15 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 import type { GestureRecognizer, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { LandmarkerStatus } from "@/hooks/useFaceLandmarker";
-import { type Gesture, GESTURES, type Hand, type PoseLandmark } from "@/lib/poseSkeleton";
+import {
+  type Gesture,
+  GESTURES,
+  type Hand,
+  handShape,
+  MIN_GESTURE_SCORE,
+  type PoseLandmark,
+  SHAPE_SCORE,
+} from "@/lib/poseSkeleton";
 
 const WASM_URL =
   "/mediapipe/wasm";
@@ -127,11 +136,14 @@ export function usePoseLandmarker(
           const result = models.gesture.recognizeForVideo(video, now);
           result.landmarks.forEach((landmarks, index) => {
             const top = result.gestures[index]?.[0];
-            hands.push({
-              landmarks,
-              gesture: isGesture(top?.categoryName) ? top.categoryName : null,
-              score: top?.score ?? 0,
-            });
+            const recognized = isGesture(top?.categoryName) && (top?.score ?? 0) >= MIN_GESTURE_SCORE;
+            if (recognized) {
+              hands.push({ landmarks, gesture: top.categoryName as Gesture, score: top.score });
+              return;
+            }
+            // 모델이 못 알아보면 손가락 점으로 직접 판정한다
+            const shape = handShape(landmarks);
+            hands.push({ landmarks, gesture: shape, score: shape ? SHAPE_SCORE : 0 });
           });
         }
         onFrameRef.current(pose, hands, video);

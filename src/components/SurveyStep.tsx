@@ -10,6 +10,7 @@
  *   - 2026-11-03 재료 아이콘 표시, 숫자 키 선택, 선택 시 콜백 추가
  *   - 2026-11-03 재료를 이모지 대신 아이콘으로 표시
  *   - 2026-11-24 질문을 크게(멀리서도 읽히게), 진행을 8칸 막대로, 선택지를 큰 버튼과 '재료: ~' 표기로 변경
+ *   - 2026-11-26 질문·선택지 글씨를 한 단계씩 줄임
  */
 
 "use client";
@@ -67,7 +68,7 @@ export default function SurveyStep({
           재료 {index + 1} / {QUESTIONS.length}
         </p>
       </div>
-      <h2 className="font-display text-4xl leading-tight text-amber-50 md:text-5xl">{question.title}</h2>
+      <h2 className="font-display text-3xl leading-tight text-amber-50 md:text-4xl">{question.title}</h2>
       <div className="grid w-full grid-cols-1 gap-3.5 sm:grid-cols-2">
         {options.map((option, optionIndex) => {
           const { Icon, label, color } = ANSWER_INGREDIENTS[option.value];
@@ -76,14 +77,14 @@ export default function SurveyStep({
               key={option.value}
               type="button"
               onClick={() => choose(option.value)}
-              className="flex items-center gap-4 rounded-2xl border-[1.5px] border-white/20 bg-white/5 px-5 py-4 text-left transition hover:border-amber-200 hover:bg-amber-200/10"
+              className="flex items-center gap-3 rounded-2xl border-[1.5px] border-white/20 bg-white/5 px-4 py-3 text-left transition hover:border-amber-200 hover:bg-amber-200/10"
             >
-              <Icon className="shrink-0 text-4xl" style={{ color }} aria-hidden />
+              <Icon className="shrink-0 text-3xl" style={{ color }} aria-hidden />
               <span className="flex flex-col gap-0.5">
-                <span className="text-2xl font-bold">
+                <span className="text-xl font-bold">
                   {optionIndex + 1}. {option.label}
                 </span>
-                <span className="text-base text-emerald-200">재료: {label}</span>
+                <span className="text-sm text-emerald-200">재료: {label}</span>
               </span>
             </button>
           );
