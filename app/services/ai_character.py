@@ -65,6 +65,8 @@ INSTRUCTIONS = """너는 체험 부스의 묘약 기록 담당자다. 재료를 
   - jaw_width_ratio: 턱 폭(좁음 / 넓음). 인외: 가볍고 경쾌한 사물 / 묵직한 사물. 동물: 꼬리가 가늘고 김 / 꼬리가 풍성하고 복슬복슬함
   점수가 0.5에서 멀수록 그 특징을 캐릭터에 더 뚜렷하게 드러낸다.
 - silhouette, gaze, presence, stance, realm, bond, wish, crisis: 룰이 분류한 재료 문구다.
+- major, seat: 참가자가 고른 대학교 생활 재료(끌리는 단과대의 기운, 강의실 자리 버릇)다. 성향(disposition)이나 설정(backstory)에 자연스럽게 녹인다.
+  질문은 대학교 장면으로 물었지만 캐릭터는 판타지 세계에 산다. 대학교 이름이나 실제 학교·학과명을 쓰지 않는다.
 - palette, lucky_item_type: 룰이 정한 값이다. 그대로 따른다.
 - ability: 룰이 정한 고유 능력 이름이다. 바꾸지 않고 그대로 쓴다.
 - signature_trait, animal_look: 얼굴에서 가장 두드러진 특징과 가장 닮은 동물상이다. 외형과 설정에 자연스럽게 묻어나게 한다.

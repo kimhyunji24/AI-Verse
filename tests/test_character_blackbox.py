@@ -50,6 +50,8 @@ ANSWERS = {
     "crisis": "confront",
     "power": "fly",
     "bag": "book",
+    "major": "science",
+    "seat": "back",
 }
 ANSWER_OPTIONS = {
     "character_type": ["nonhuman", "animal"],
@@ -60,6 +62,8 @@ ANSWER_OPTIONS = {
     "crisis": ["confront", "hide", "trick", "call_friends"],
     "power": ["read_minds", "stop_time", "fly", "transform"],
     "bag": ["snack", "book", "map", "charm"],
+    "major": ["engineering", "humanities", "science", "arts"],
+    "seat": ["front", "window", "back", "door"],
 }
 # 스키마에 정의된 측정값 범위 (경계값 테스트용)
 FEATURE_BOUNDS = {
@@ -196,6 +200,8 @@ def test_eye_gap_changes_palette(client, openai_server):
         ("crisis", "crisis"),
         ("bag", "lucky_item_type"),
         ("wish_2027", "wish"),
+        ("major", "major"),
+        ("seat", "seat"),
         ("companion", "bond"),
     ],
 )

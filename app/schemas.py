@@ -58,6 +58,9 @@ class Answers(BaseModel):
     crisis: Literal["confront", "hide", "trick", "call_friends"]
     power: Literal["read_minds", "stop_time", "fly", "transform"]
     bag: Literal["snack", "book", "map", "charm"]
+    # 대학교 문항 (2026-11-26 추가). 예전 화면이 보내지 않아도 되도록 기본값을 둔다.
+    major: Literal["engineering", "humanities", "science", "arts"] = "humanities"
+    seat: Literal["front", "window", "back", "door"] = "window"
 
 
 # 프론트가 얼굴 랜드마크로 계산한 동물상 (faceLook.ts 의 ANIMALS key와 같다)
@@ -103,6 +106,9 @@ class CharacterParameters(BaseModel):
     wish: str
     crisis: str
     lucky_item_type: str
+    # 대학교 문항: 끌리는 단과대와 강의실 자리
+    major: str = ""
+    seat: str = ""
     # 룰로 확정되는 값
     palette: str
     ability: str

@@ -27,6 +27,7 @@
   - 2026-11-26 얼굴 패턴으로 정확히 고르기: 동물 종족은 가장 닮은 동물상(ANIMAL_LOOK_POOLS)에서,
                고유 능력은 가장 두드러진 얼굴 특징(ABILITY_FLAVORS) × 갖고 싶은 힘(ABILITY_CORES)으로,
                선택 이유는 같은 특징과 동물상·실루엣을 넣은 문장 틀(build_reason)로 만든다
+  - 2026-11-26 대학교 문항 2개 추가: 끌리는 단과대(MAJORS, 능력치 비중 MAJOR_BONUS), 강의실 자리(SEATS, 버릇 문구)
   - 2026-11-26 사물 머리도 장소·얼굴 표 대신 44종(OBJECT_HEADS)에서 완전히 무작위로 하나, 종족마다 동작(RACE_ACTIONS)
   - 2026-11-26 의상 템플릿을 20종으로 늘리고, 소품(PROPS) 24종 중 하나를 무작위로 추가
   - 2026-11-26 이름 수식어에서 체형을 떠올리게 하는 말(포동포동한, 토실토실한, 동글동글한) 제외
@@ -441,6 +442,26 @@ CRISIS_BONUS = {
     "trick": "insight",
     "call_friends": "resonance",
 }
+# 대학교 문항: 끌리는 단과대 → 설정 재료 문구, 비중을 더해 주는 능력치
+MAJORS = {
+    "engineering": "밤새 무언가를 만들어 내는 공대의 기운",
+    "humanities": "글과 이야기를 사랑하는 인문대의 기운",
+    "science": "실험실 불빛 아래 답을 찾는 자연대의 기운",
+    "arts": "무대와 작업실을 누비는 예체능의 기운",
+}
+MAJOR_BONUS = {
+    "engineering": "willpower",
+    "humanities": "resonance",
+    "science": "insight",
+    "arts": "agility",
+}
+# 강의실에서 고르는 자리 → 버릇 문구
+SEATS = {
+    "front": "늘 맨 앞 가운데 자리에 앉는 버릇",
+    "window": "창가 자리에서 바깥을 보며 생각에 잠기는 버릇",
+    "back": "맨 뒷자리에서 강의실 전체를 살피는 버릇",
+    "door": "문 바로 옆자리에서 언제든 나갈 준비를 하는 버릇",
+}
 STAT_FIELDS = ("insight", "vitality", "resonance", "agility", "willpower", "luck")
 STAT_TOTAL = 300
 STAT_MINIMUM = 30
@@ -486,6 +507,7 @@ def _base_stats(features: FaceFeatures, answers: Answers, scores: dict[str, floa
     weights["luck"] = _normalize(abs(features.head_yaw) + abs(features.head_roll), 0, 20)
     weights[WISH_BONUS[answers.wish_2027]] += 0.5
     weights[CRISIS_BONUS[answers.crisis]] += 0.5
+    weights[MAJOR_BONUS[answers.major]] += 0.3
 
     # 모든 능력치에 최솟값을 보장한 뒤 나머지를 비중대로 나눠 합계를 맞춘다.
     # 비중이 전부 0이어도 나눌 수 있도록 각 항목에 0.1씩 더한다.
@@ -596,6 +618,8 @@ def build_parameters(
         wish=WISHES[answers.wish_2027],
         crisis=CRISES[answers.crisis],
         lucky_item_type=LUCKY_ITEM_TYPES[answers.bag],
+        major=MAJORS[answers.major],
+        seat=SEATS[answers.seat],
         palette=PALETTES[answers.time_of_day][eye_gap],
         ability=f"{ABILITY_FLAVORS[signature][direction]} {ABILITY_CORES[answers.power]}",
         signature_trait=REASON_TRAITS[signature][direction],
