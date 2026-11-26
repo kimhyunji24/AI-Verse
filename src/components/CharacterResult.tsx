@@ -42,8 +42,8 @@ export default function CharacterResult({
 
   if (photocard) {
     return (
-      // 완성 카드는 카드 공개 영상으로 나오고, 누르면 섬광과 함께 앞면이 보인다(CardReveal). 출력할 때는 카드째 아래로 내려간다.
-      <CardReveal revealed={revealed} onReveal={onReveal} className={printing ? "anim-card-print" : ""}>
+      // 완성 카드는 공개 연출로 나오고, 누르면 섬광과 함께 앞면이 보인다(CardReveal). 인쇄한 뒤에도 그대로 떠 있다.
+      <CardReveal revealed={revealed} onReveal={onReveal}>
         {/* 백엔드가 만든 파일을 그대로 보여준다. 크기가 고정이라 next/image 최적화가 필요 없다. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

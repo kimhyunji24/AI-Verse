@@ -26,6 +26,7 @@
  *   - 2026-11-24 얼굴 세부 수치 14개로 동물상 유사도를 계산해 상위 3개를 재료로 넣고, 질문 화면에 AI 얼굴 분석 패널 표시
  *   - 2026-11-24 얼굴 측정 뒤 정밀 분석 화면(analysis) 추가: 홍채 지름 기준 mm 실측, 측정선이 그려진 사진, 얼굴형·대칭·비율표
  *   - 2026-11-26 인쇄를 부스 PC 프린터로 바로 보내도록 변경(/api/print), 실패하면 인쇄 창으로 대신함
+ *   - 2026-11-26 인쇄를 보낸 뒤 화면을 바로 끝내지 않고 카드를 띄워 둠, Enter로 처음으로
  *   - 2026-11-26 자동 인화: 카드가 공개되고 6초 뒤 저절로 인쇄 (Enter로 바로 인쇄)
  *   - 2026-11-26 숫자·화살표 키보드로 쓰도록 안내 문구를 Enter / Enter 길게 누르기로 변경
  *   - 2026-11-26 캐릭터 요청에 닮은 동물상 상위 3개를 보내 동물 캐릭터 종족을 고르게 함
@@ -109,7 +110,6 @@ const SPELL_HOLD_MS = 1500;
 // 응답이 빨라도 끓는 연출을 볼 수 있도록 보장하는 최소 시간
 const BREW_MIN_MS = 3000;
 const BURST_MS = 1200;
-const PRINT_MS = 1800;
 // 카드가 공개된 뒤 자동으로 인쇄하기까지 (뒤집히는 연출 약 2초 + 카드를 볼 시간)
 const AUTO_PRINT_MS = 6000;
 const INGREDIENT_GAP_MS = 450;
@@ -432,6 +432,8 @@ export default function ObservatoryFlow() {
       else if (step === "analysis") startPose();
       else if (step === "spell") startHold();
       else if (step === "card") pressCard();
+      // 인쇄를 보낸 뒤에도 카드를 띄워 두고, 다 나온 걸 확인한 다음 Enter로 처음으로 돌아간다
+      else if (step === "printing") restart();
       else if (step === "failed") {
         if (failure?.retryable && features && answers) generate(features, answers);
         else restart();
@@ -482,12 +484,6 @@ export default function ObservatoryFlow() {
     return () => clearTimeout(timer);
   }, [step, poseStatus, poseCount, poseAttempt, finishPose]);
 
-  useEffect(() => {
-    if (step === "printing") {
-      const timer = setTimeout(restart, PRINT_MS);
-      return () => clearTimeout(timer);
-    }
-  }, [step, restart]);
 
   useEffect(() => {
     if (!flash) return;
@@ -739,6 +735,14 @@ export default function ObservatoryFlow() {
             >
               곧 자동으로 인쇄돼요 · 바로 인쇄 (Enter)
             </button>
+          )}
+          {step === "printing" && (
+            <div className="anim-card-appear flex flex-col items-center gap-3" role="status">
+              <p className="text-xl text-amber-100">카드를 인쇄하고 있어요! 프린터에서 다 나오면 가져가세요</p>
+              <button type="button" onClick={restart} className={primaryButton}>
+                처음으로 (Enter)
+              </button>
+            </div>
           )}
           {/* 인쇄할 때만 보이는 카드 이미지. body 바로 아래에 둬야 인쇄 때 나머지 화면을 통째로 뺄 수 있다 (globals.css의 .print-card) */}
           {photocard &&
