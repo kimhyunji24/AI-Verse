@@ -6,12 +6,14 @@
  * 비고: Next 서버가 프린터가 연결된 부스 PC에서 돌아가야 한다.
  *       프린터는 연결된 것 중 Canon SELPHY CP1500을 자동으로 찾는다. 못 찾으면 인쇄하지 않고 실패를 돌려준다
  *       (다른 프린터로 잘못 나가지 않게). PRINTER_NAME 을 주면 그 프린터를 쓴다.
- *       맥은 엽서 여백 없음(Postcard.Fullbleed, 100×148mm)으로 보낸다. PRINT_MEDIA 로 바꿀 수 있다.
- *       윈도우는 프린터 드라이버의 기본 용지를 엽서(여백 없음)로 맞춰 둔다.
+ *       용지는 카드 크기(54×86mm, 여백 없음)다. 카드 이미지(100:148)가 용지보다 조금 덜 길쭉해서
+ *       잘리지 않게 전체를 용지 안에 맞추고, 남는 위아래는 얇은 흰 여백이 된다.
+ *       맥은 54x86mm.Fullbleed 로 보낸다(PRINT_MEDIA 로 바꿀 수 있다). 윈도우는 드라이버 기본 용지를 카드 크기(여백 없음)로 맞춰 둔다.
  *       받는 값은 백엔드의 카드 경로뿐이라 다른 주소의 파일은 인쇄하지 않는다.
  *
  * 수정 이력:
  *   - 2026-11-26 최초 작성
+ *   - 2026-11-26 용지를 엽서에서 카드 크기(54×86mm)로, 카드 전체가 보이게 비율 유지해 맞춤
  *   - 2026-11-26 와이파이와 USB로 둘 다 등록돼 있으면 USB 쪽 CP1500을 고름
  *   - 2026-11-26 Canon SELPHY CP1500을 자동으로 찾아 그 프린터로만 인쇄, 맥은 엽서 여백 없음
  */
@@ -48,7 +50,14 @@ try {
   if (-not $doc.PrinterSettings.IsValid) { throw "프린터를 찾을 수 없음: $($doc.PrinterSettings.PrinterName)" }
   $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
   $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
-  $doc.add_PrintPage({ param($s, $e) $e.Graphics.DrawImage($img, $e.PageBounds); $e.HasMorePages = $false })
+  # 비율을 지키며 용지 안에 전체가 들어가게 맞추고 가운데에 둔다 (남는 쪽은 흰 여백)
+  $doc.add_PrintPage({ param($s, $e)
+    $page = $e.PageBounds
+    $scale = [Math]::Min($page.Width / $img.Width, $page.Height / $img.Height)
+    $w = $img.Width * $scale; $h = $img.Height * $scale
+    $e.Graphics.DrawImage($img, [single](($page.Width - $w) / 2), [single](($page.Height - $h) / 2), [single]$w, [single]$h)
+    $e.HasMorePages = $false
+  })
   $doc.Print()
 } finally { $img.Dispose() }
 `;
@@ -84,7 +93,7 @@ async function printFile(file: string) {
   }
   const printer = process.env.PRINTER_NAME || (await findBoothPrinter());
   if (!printer) throw new Error("CP1500 프린터를 찾을 수 없음");
-  const media = process.env.PRINT_MEDIA || "Postcard.Fullbleed";
+  const media = process.env.PRINT_MEDIA || "54x86mm.Fullbleed";
   await run("lp", ["-d", printer, "-o", `media=${media}`, "-o", "fit-to-page", file], { timeout: 60_000 });
 }
 
