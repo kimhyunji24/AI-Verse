@@ -4,7 +4,7 @@
  * 역할: 마녀의 묘약 콘셉트로 전체 체험을 진행한다.
  *       위치 맞추기 → 버튼 → 3초 카운트다운 → 얼굴 측정 → 포즈 잡기 → 재료 투입(설문) → 버튼 꾹 누르기
  *       → 항아리 끓이기(캐릭터 생성) → 펑! → 포토카드 등장 → 버튼 → 카드가 아래로 내려감
- * 비고: 버튼은 블루투스 키보드의 Space, Enter 이다. (useArcadeButton)
+ * 비고: 버튼은 숫자·화살표 키보드의 Enter(숫자 패드 Enter 포함)이다. Space도 된다. (useArcadeButton)
  *       캐릭터 글이 나오면 바로 카드를 보여주고, 그 사이 백엔드가 일러스트를 그려 포토카드를 합성한다.
  *       실제 프린터 출력은 아직 연결되어 있지 않다. 포토카드는 백엔드에 파일로 저장되고, 카드가 내려가는 연출까지만 동작한다.
  *
@@ -26,6 +26,7 @@
  *   - 2026-11-24 얼굴 세부 수치 14개로 동물상 유사도를 계산해 상위 3개를 재료로 넣고, 질문 화면에 AI 얼굴 분석 패널 표시
  *   - 2026-11-24 얼굴 측정 뒤 정밀 분석 화면(analysis) 추가: 홍채 지름 기준 mm 실측, 측정선이 그려진 사진, 얼굴형·대칭·비율표
  *   - 2026-11-26 인쇄를 부스 PC 프린터로 바로 보내도록 변경(/api/print), 실패하면 인쇄 창으로 대신함
+ *   - 2026-11-26 숫자·화살표 키보드로 쓰도록 안내 문구를 Enter / Enter 길게 누르기로 변경
  *   - 2026-11-26 캐릭터 요청에 닮은 동물상 상위 3개를 보내 동물 캐릭터 종족을 고르게 함
  */
 
@@ -117,7 +118,7 @@ const ALIGNMENT_MESSAGES: Record<Alignment, string> = {
   too_close: "조금 뒤로 물러나 주세요",
   off_center: "얼굴을 화면 가운데로 옮겨 주세요",
   turned: "정면을 바라봐 주세요",
-  ready: "준비 완료! 버튼을 눌러 시작하세요",
+  ready: "준비 완료! Enter를 눌러 시작하세요",
 };
 
 const primaryButton =
@@ -399,7 +400,8 @@ export default function ObservatoryFlow() {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
         })
         .catch((error) => {
-          console.error("자동 인쇄 실패, 인쇄 창으로 대신함", error);
+          // 인쇄 창으로 이어지므로 오류창(개발 화면)을 띄우지 않게 경고로 남긴다
+          console.warn("자동 인쇄 실패, 인쇄 창으로 대신함", error);
           window.print();
         })
         .finally(() => {
@@ -529,7 +531,7 @@ export default function ObservatoryFlow() {
             className={`anim-card-appear ${primaryButton}`}
             style={{ animationDelay: "2.8s" }}
           >
-            다음: 포즈 잡기
+            다음: 포즈 잡기 (Enter)
           </button>
         </div>
       )}
@@ -549,7 +551,7 @@ export default function ObservatoryFlow() {
             disabled={alignment !== "ready"}
             className={primaryButton}
           >
-            시작
+            시작 (Enter)
           </button>
         </div>
       )}
@@ -620,7 +622,7 @@ export default function ObservatoryFlow() {
                 <h2 className="font-display text-center text-2xl">
                   재료가 모두 모였어요!
                 </h2>
-                <p>버튼을 꾹 눌러 주문을 외우세요</p>
+                <p>Enter를 길게 눌러 주문을 외우세요</p>
                 <div className="h-3 w-full overflow-hidden rounded-full bg-white/15">
                   <div
                     className="h-full bg-gradient-to-r from-emerald-300 to-purple-400"
@@ -634,7 +636,7 @@ export default function ObservatoryFlow() {
                   onPointerLeave={cancelHold}
                   className={`${primaryButton} touch-none select-none`}
                 >
-                  꾹 누르기
+                  Enter 길게 누르기
                 </button>
               </div>
             )}
@@ -651,7 +653,7 @@ export default function ObservatoryFlow() {
                       onClick={() => generate(features, answers)}
                       className={primaryButton}
                     >
-                      다시 끓이기
+                      다시 끓이기 (Enter)
                     </button>
                   )}
                   <button
@@ -696,7 +698,7 @@ export default function ObservatoryFlow() {
               <p>{cardFailure.message}</p>
               <div className="flex gap-3">
                 <button type="button" onClick={pressCard} className={primaryButton}>
-                  {cardFailure.retryable ? "다시 그리기" : "이대로 완성하기"}
+                  {cardFailure.retryable ? "다시 그리기" : "이대로 완성하기"} (Enter)
                 </button>
                 <button
                   type="button"
@@ -710,7 +712,7 @@ export default function ObservatoryFlow() {
           )}
           {step === "card" && photocard && !revealed && (
             <p className="anim-card-appear text-xl text-amber-100" role="status">
-              카드를 눌러서 내 부캐를 확인해 보세요
+              Enter를 눌러 내 부캐를 확인해 보세요
             </p>
           )}
           {step === "card" && photocard && revealed && (
@@ -721,7 +723,7 @@ export default function ObservatoryFlow() {
               className={`anim-card-appear ${primaryButton}`}
               style={{ animationDelay: "1.1s" }}
             >
-              내 카드 인쇄하기
+              내 카드 인쇄하기 (Enter)
             </button>
           )}
           {/* 인쇄할 때만 보이는 카드 이미지. body 바로 아래에 둬야 인쇄 때 나머지 화면을 통째로 뺄 수 있다 (globals.css의 .print-card) */}

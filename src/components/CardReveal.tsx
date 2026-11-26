@@ -170,7 +170,7 @@ export default function CardReveal({
               </div>
             </div>
             <canvas ref={frontRef} className="reveal-fx" />
-            {!revealed && <p className="reveal-hint">카드를 눌러 공개하세요</p>}
+            {!revealed && <p className="reveal-hint">Enter를 눌러 카드를 공개하세요</p>}
           </div>,
           document.body,
         )}
