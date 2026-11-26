@@ -11,6 +11,7 @@
  *   - 2026-11-22 최초 작성
  *   - 2026-11-22 손가락 관절(손 21점)과 손 모양 코드 추가
  *   - 2026-11-26 머리 원 안에 눈·코·입을 그려 얼굴 방향과 손-얼굴 위치가 그림 모델에 전달되게 함
+ *   - 2026-11-26 눈·입 때문에 사람 얼굴로 그려져서 빼고, 귀 가운데 원 + 코 점 하나로 고개 방향만 표시
  *   - 2026-11-26 손 모양 모델이 못 알아보면(None·낮은 점수) 손가락 21점으로 직접 판정 (handShape)
  */
 
@@ -77,10 +78,6 @@ export function handShape(hand: Landmark[]): Gesture | null {
 // MediaPipe Pose 랜드마크 번호
 const P = {
   nose: 0,
-  eyeA: 2,
-  eyeB: 5,
-  mouthA: 9,
-  mouthB: 10,
   earA: 7,
   earB: 8,
   shoulderA: 11,
@@ -195,47 +192,32 @@ export function drawPose(
   }
   context.lineWidth = lineWidth;
 
-  // 머리: 얼굴 없이 위치와 크기만 나타내는 원
+  // 머리: 얼굴 없이 위치와 크기만 나타내는 원. 원은 두 귀 가운데에 두고, 코 자리에 점 하나만 찍어
+  // 고개가 돌아간 쪽을 나타낸다. 눈·입을 그리면 그림 모델이 사람 얼굴로 그려 버려서 넣지 않는다.
   const nose = pose[P.nose];
   if (visible(nose)) {
-    const center = project(nose);
+    const nosePoint = project(nose);
     const shoulderA = project(pose[P.shoulderA]);
     const shoulderB = project(pose[P.shoulderB]);
     const shoulderWidth = Math.hypot(shoulderA.x - shoulderB.x, shoulderA.y - shoulderB.y);
     const earA = pose[P.earA];
     const earB = pose[P.earB];
-    const earWidth =
-      visible(earA) && visible(earB)
-        ? Math.hypot(project(earA).x - project(earB).x, project(earA).y - project(earB).y)
-        : 0;
+    const earsVisible = visible(earA) && visible(earB);
+    const earWidth = earsVisible
+      ? Math.hypot(project(earA).x - project(earB).x, project(earA).y - project(earB).y)
+      : 0;
     const radius = Math.max(earWidth * 0.75, shoulderWidth * 0.22);
+    const center = earsVisible
+      ? { x: (project(earA).x + project(earB).x) / 2, y: (project(earA).y + project(earB).y) / 2 }
+      : nosePoint;
     context.strokeStyle = TORSO;
     context.beginPath();
     context.arc(center.x, center.y, radius, 0, Math.PI * 2);
     context.stroke();
-
-    // 얼굴 방향: 눈 두 점, 코 점, 입 선. 원 안에서 어느 쪽으로 쏠렸는지로 고개 돌림·기울기가 보인다
     context.fillStyle = TORSO;
-    const dot = (point: PoseLandmark, size: number) => {
-      const p = project(point);
-      context.beginPath();
-      context.arc(p.x, p.y, size, 0, Math.PI * 2);
-      context.fill();
-    };
-    for (const eye of [pose[P.eyeA], pose[P.eyeB]]) if (visible(eye)) dot(eye, radius * 0.12);
-    dot(nose, radius * 0.08);
-    const mouthA = pose[P.mouthA];
-    const mouthB = pose[P.mouthB];
-    if (visible(mouthA) && visible(mouthB)) {
-      const a = project(mouthA);
-      const b = project(mouthB);
-      context.lineWidth = Math.max(2, lineWidth * 0.5);
-      context.beginPath();
-      context.moveTo(a.x, a.y);
-      context.lineTo(b.x, b.y);
-      context.stroke();
-      context.lineWidth = lineWidth;
-    }
+    context.beginPath();
+    context.arc(nosePoint.x, nosePoint.y, radius * 0.12, 0, Math.PI * 2);
+    context.fill();
   }
 }
 

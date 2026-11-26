@@ -118,8 +118,8 @@ body {
   @page { size: 54mm 86mm; margin: 0; }
   html, body { margin: 0; padding: 0; background: #fff; }
   body > *:not(.print-card) { display: none !important; }
-  /* 카드 크기 용지(54×86mm)에 카드 전체가 보이게 맞춘다 (위아래 얇은 여백) */
-  .print-card { display: block; width: 54mm; height: 86mm; object-fit: contain; }
+  /* 카드 크기 용지(54×86mm)에 테두리까지 전체가 보이게 맞춘다. 프린터가 가장자리를 잘라도 남도록 2mm 안쪽에 둔다 */
+  .print-card { display: block; width: 50mm; height: 82mm; margin: 2mm; object-fit: contain; }
 }
 
 .font-display { font-family: var(--font-gowun-batang), serif; font-weight: 700; }
