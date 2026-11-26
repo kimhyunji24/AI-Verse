@@ -63,10 +63,10 @@ ANIMAL_STYLE = """[Character Design & Anatomy]
 EMOTION_TEXT = dict(EMOTIONS)
 # 설문 장소(realm 문구) -> 동물 캐릭터 배경
 ANIMAL_BACKGROUNDS = {
-    REALMS["deep_sea"]: "a cozy, simple pastel underwater scene with a few bubbles and seaweed",
-    REALMS["night_sky"]: "a cozy, simple pastel night sky with a few stars",
-    REALMS["old_library"]: "a cozy, simple pastel corner of an old library with a few books",
-    REALMS["neon_city"]: "a cozy, simple pastel city street at dusk with a few soft glowing signs",
+    REALMS["deep_sea"]: "a cozy, simple pastel campus cafe with a coffee counter and a few warm lamps",
+    REALMS["night_sky"]: "a cozy, simple pastel campus bench under a starry night sky with a few trees",
+    REALMS["old_library"]: "a cozy, simple pastel corner of a big library with tall bookshelves",
+    REALMS["neon_city"]: "a cozy, simple pastel dormitory cafeteria with steaming rice bowls on trays",
 }
 
 
