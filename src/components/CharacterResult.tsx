@@ -1,7 +1,7 @@
 /**
  * 캐릭터 포토카드 (CharacterResult)
  *
- * 역할: 생성된 캐릭터를 세로 포토카드(100×148mm 비율) 모양으로 보여준다.
+ * 역할: 생성된 캐릭터를 세로 포토카드(54×86mm 카드 용지 비율) 모양으로 보여준다.
  * 비고: 백엔드가 포토카드(일러스트 포함 PNG)를 다 만들면 그 이미지를 그대로 보여준다.
  *       만드는 동안에는 글만 담긴 미리보기 카드를 보여주고 일러스트 자리에 진행 문구를 띄운다.
  *
@@ -59,7 +59,7 @@ export default function CharacterResult({
   return (
     <article
       data-testid="character"
-      className={`flex aspect-[100/148] w-[min(92vw,26rem)] flex-col gap-2.5 rounded-2xl border-2 border-amber-300/70 bg-gradient-to-b from-indigo-950 via-purple-950 to-black p-4 text-sm shadow-[0_0_60px_rgba(168,85,247,0.45)] ${animation}`}
+      className={`flex aspect-[54/86] w-[min(92vw,26rem)] flex-col gap-2.5 rounded-2xl border-2 border-amber-300/70 bg-gradient-to-b from-indigo-950 via-purple-950 to-black p-4 text-sm shadow-[0_0_60px_rgba(168,85,247,0.45)] ${animation}`}
     >
       <header className="text-center">
         <p className="text-base text-amber-200/90">

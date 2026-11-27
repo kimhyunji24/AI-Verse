@@ -89,7 +89,7 @@ body {
 /* 카드는 화면 가운데 크게. 3D 뒤집기는 이 안의 .reveal-card 에 revealFx.ts 가 직접 건다 */
 .reveal-overlay-card {
   position: absolute; left: 50%; top: 50%; translate: -50% -50%;
-  width: min(46vh, 70vw); aspect-ratio: 100 / 148; perspective: 1600px;
+  width: min(46vh, 70vw); aspect-ratio: 54 / 86; perspective: 1600px;
 }
 .reveal-card { position: absolute; inset: 0; transform-style: preserve-3d; opacity: 0; }
 .reveal-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 1rem; overflow: hidden; }
