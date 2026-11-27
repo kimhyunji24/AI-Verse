@@ -10,6 +10,7 @@
 
 수정 이력:
   - 2026-11-22 최초 작성
+  - 2026-11-27 카드 크기를 인쇄 용지(54×86mm) 비율로, 인쇄가 어둡게 나와 밝은 카드(라이트 모드)로
   - 2026-11-22 트레이딩 카드 디자인으로 변경 (대표 능력치, 고유 능력 칸, 카드 번호, 등급 별)
   - 2026-11-22 풀아트 홀로그램 템플릿으로 변경 (전면 일러스트, 홀로 포일 테두리, 반짝이, 유리 패널, 1/1 표기)
   - 2026-11-22 일러스트를 정보 패널 위 영역에만 배치해 캐릭터가 패널에 가려지지 않게 변경, 패널 뒤는 흐린 그림으로 채움
@@ -46,9 +47,14 @@ CONTENT = WIDTH - PAD * 2
 
 WHITE = (255, 255, 255)
 SHADOW = (12, 8, 24)
+# 밝은 카드(라이트 모드): 인쇄하면 화면보다 어둡게 나와서 바탕을 밝게 하고 글자를 진하게 쓴다
+INK = (36, 28, 62)  # 본문 글자
+SOFT_INK = (88, 78, 120)  # 보조 글자
+PAPER = (255, 255, 255)  # 밝은 막·글자 외곽선
 # 투명 배경 일러스트를 얹을 밝은 바탕
 ART_BACKDROP = (250, 246, 238)
-GOLD = (255, 214, 120)
+GOLD = (178, 122, 18)  # 밝은 바탕에서 읽히는 진한 금색
+FOIL_GOLD = (232, 190, 96)  # 테두리 금선
 
 STAT_LABELS = {
     "insight": "통찰",
@@ -61,9 +67,9 @@ STAT_LABELS = {
 
 # 별 개수: (등급 이름, 등급 색)
 RARITIES = {
-    1: ("RARE", (170, 220, 255)),
-    2: ("EPIC", (220, 170, 255)),
-    3: ("LEGEND", (255, 214, 120)),
+    1: ("RARE", (40, 120, 200)),
+    2: ("EPIC", (140, 70, 200)),
+    3: ("LEGEND", (178, 122, 18)),
 }
 
 FONT_CANDIDATES = (
@@ -143,9 +149,9 @@ def _paragraph(draw, xy, text, font, width, fill, *, max_lines: int, spacing: fl
     return y
 
 
-def _outlined(draw, xy, text, font, fill=WHITE, *, stroke=4, anchor="la") -> None:
-    """일러스트 위에서도 읽히도록 어두운 외곽선을 두른 글자"""
-    draw.text(xy, text, font=font, fill=fill, anchor=anchor, stroke_width=stroke, stroke_fill=SHADOW)
+def _outlined(draw, xy, text, font, fill=INK, *, stroke=4, anchor="la") -> None:
+    """일러스트 위에서도 읽히도록 흰 외곽선을 두른 진한 글자"""
+    draw.text(xy, text, font=font, fill=fill, anchor=anchor, stroke_width=stroke, stroke_fill=PAPER)
 
 
 # ---------- 홀로그램 재료 ----------
@@ -267,7 +273,7 @@ def compose_card(
     # 1) 일러스트: 패널 뒤까지 흐린 그림을 깔고, 패널 위 영역에만 선명한 그림을 얹는다
     art = _flatten(Image.open(io.BytesIO(illustration_png)))
     card = _cover(art, size).filter(ImageFilter.GaussianBlur(28))
-    card = Image.blend(card, Image.new("RGB", size, SHADOW), 0.35)
+    card = Image.blend(card, Image.new("RGB", size, PAPER), 0.45)
     sharp = _cover(art, (WIDTH, ART_BOTTOM))
     fade = _vertical_fade((WIDTH, ART_BOTTOM), [(0, 255), ((PANEL_TOP - 30) / ART_BOTTOM, 255), (1, 0)])
     card.paste(sharp, (0, 0), fade)
@@ -278,13 +284,13 @@ def compose_card(
     gloss = _gloss(size).point(lambda value: round(value * GLOSS_STRENGTH))
     card = Image.composite(ImageChops.screen(card, rainbow), card, gloss)
 
-    # 3) 글자가 읽히도록 위아래를 어둡게
-    shade = Image.new("RGB", size, SHADOW)
+    # 3) 글자가 읽히도록 위아래를 밝게
+    shade = Image.new("RGB", size, PAPER)
     card = Image.composite(
         shade,
         card,
         _vertical_fade(
-            size, [(0, 175), (0.17, 0), ((PANEL_TOP - 120) / HEIGHT, 0), (PANEL_TOP / HEIGHT, 150), (1, 235)]
+            size, [(0, 150), (0.17, 0), ((PANEL_TOP - 120) / HEIGHT, 0), (PANEL_TOP / HEIGHT, 120), (1, 200)]
         ),
     )
     card = card.convert("RGBA")
@@ -317,7 +323,7 @@ def compose_card(
     ui = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(ui)
     draw.rounded_rectangle(
-        (FRAME, FRAME, WIDTH - FRAME, HEIGHT - FRAME), radius=RADIUS - FRAME, outline=(*GOLD, 255), width=4
+        (FRAME, FRAME, WIDTH - FRAME, HEIGHT - FRAME), radius=RADIUS - FRAME, outline=(*FOIL_GOLD, 255), width=4
     )
     draw.rounded_rectangle((2, 2, WIDTH - 3, HEIGHT - 3), radius=RADIUS, outline=(255, 255, 255, 160), width=3)
 
@@ -349,7 +355,7 @@ def compose_card(
         outline=(255, 255, 255, 255),
         width=5,
     )
-    _outlined(draw, emblem_c, character.element[:1], _font(48, 900), WHITE, stroke=3, anchor="mm")
+    _outlined(draw, emblem_c, character.element[:1], _font(48, 900), INK, stroke=3, anchor="mm")
 
     number_font, label_font = _font(72, 900), _font(28, 800)
     number = str(stats[top_key])
@@ -373,7 +379,7 @@ def compose_card(
             CONTENT,
         ),
         _font(30, 700),
-        (235, 230, 255),
+        SOFT_INK,
         stroke=3,
     )
 
@@ -382,7 +388,7 @@ def compose_card(
     panel = (FRAME + 26, panel_top, WIDTH - FRAME - 26, HEIGHT - FRAME - 26)
     glass = Image.new("RGBA", size, (0, 0, 0, 0))
     glass_draw = ImageDraw.Draw(glass)
-    glass_draw.rounded_rectangle(panel, radius=34, fill=(20, 14, 40, 150), outline=(255, 255, 255, 90), width=2)
+    glass_draw.rounded_rectangle(panel, radius=34, fill=(255, 255, 255, 215), outline=(*FOIL_GOLD, 200), width=2)
     ui.alpha_composite(glass)
     draw = ImageDraw.Draw(ui)
 
@@ -394,7 +400,7 @@ def compose_card(
     ImageDraw.Draw(badge_mask).rounded_rectangle(badge, radius=22, fill=255)
     ui.paste(_rainbow(size, angle_turns=4, offset=0.55).convert("RGBA"), (0, 0), badge_mask)
     draw = ImageDraw.Draw(ui)
-    draw.text(((badge[0] + badge[2]) / 2, y + 22), "고유 능력", font=badge_font, fill=SHADOW, anchor="mm")
+    draw.text(((badge[0] + badge[2]) / 2, y + 22), "고유 능력", font=badge_font, fill=INK, anchor="mm")
 
     power_font = _font(64, 900)
     power = str(stats[top_key] + stats["willpower"] // 2)
@@ -404,12 +410,12 @@ def compose_card(
         (badge[2] + 18, y + 22),
         _fit(draw, character.ability, ability_font, CONTENT - (badge[2] - PAD) - 18 - power_width - 24),
         font=ability_font,
-        fill=WHITE,
+        fill=INK,
         anchor="lm",
     )
     draw.text((WIDTH - PAD, y + 48), power, font=power_font, fill=GOLD, anchor="rs")
     y += 70
-    _paragraph(draw, (PAD, y), character.disposition, _font(28, 500), CONTENT, (225, 220, 245), max_lines=2)
+    _paragraph(draw, (PAD, y), character.disposition, _font(28, 500), CONTENT, SOFT_INK, max_lines=2)
     y += 2 * 40 + 18
 
     # 능력치: 유리 칸 6개
@@ -423,13 +429,13 @@ def compose_card(
         draw.rounded_rectangle(
             (x0, y, x0 + cell, y + 96),
             radius=16,
-            fill=(255, 255, 255, 60 if highlight else 28),
-            outline=(*GOLD, 255) if highlight else (255, 255, 255, 70),
+            fill=(*GOLD, 34) if highlight else (*INK, 12),
+            outline=(*GOLD, 255) if highlight else (*INK, 60),
             width=3 if highlight else 2,
         )
-        draw.text((x0 + cell / 2, y + 14), label, font=stat_font, fill=(210, 205, 235), anchor="ma")
+        draw.text((x0 + cell / 2, y + 14), label, font=stat_font, fill=SOFT_INK, anchor="ma")
         draw.text(
-            (x0 + cell / 2, y + 44), str(stats[key]), font=_font(38, 900), fill=GOLD if highlight else WHITE, anchor="ma"
+            (x0 + cell / 2, y + 44), str(stats[key]), font=_font(38, 900), fill=GOLD if highlight else INK, anchor="ma"
         )
     y += 96 + 22
 
@@ -438,7 +444,7 @@ def compose_card(
     draw.text((PAD, y), "LUCKY", font=lucky_label, fill=GOLD)
     offset = draw.textlength("LUCKY", font=lucky_label) + 18
     draw.text(
-        (PAD + offset, y), _fit(draw, character.lucky_item, _font(28, 600), CONTENT - offset), font=_font(28, 600), fill=WHITE
+        (PAD + offset, y), _fit(draw, character.lucky_item, _font(28, 600), CONTENT - offset), font=_font(28, 600), fill=INK
     )
     y += 52
 
@@ -449,7 +455,7 @@ def compose_card(
         f"2027년의 너에게 — {character.message_2027}",
         _font(26, 500),
         CONTENT - 22,
-        (240, 236, 255),
+        SOFT_INK,
         max_lines=3,
     )
     bar = Image.new("L", size, 0)
@@ -460,8 +466,8 @@ def compose_card(
     # 꼬리말: 팀 이름 / 부스 이름 / 카드 번호 · 1/1
     footer_y = panel[3] - 34
     footer_font = _font(22, 800)
-    draw.text((PAD, footer_y), "ai-dentity", font=footer_font, fill=(210, 205, 235), anchor="lm")
-    draw.text((WIDTH / 2, footer_y), "이게 나라고?", font=footer_font, fill=(210, 205, 235), anchor="mm")
+    draw.text((PAD, footer_y), "ai-dentity", font=footer_font, fill=SOFT_INK, anchor="lm")
+    draw.text((WIDTH / 2, footer_y), "이게 나라고?", font=footer_font, fill=SOFT_INK, anchor="mm")
     serial = f"No.{card_id[-4:].upper()} · 1/1" if card_id else "1/1"
     draw.text((WIDTH - PAD, footer_y), serial, font=footer_font, fill=GOLD, anchor="rm")
 
