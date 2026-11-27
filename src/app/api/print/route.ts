@@ -6,12 +6,13 @@
  * 비고: Next 서버가 프린터가 연결된 부스 PC에서 돌아가야 한다.
  *       프린터는 연결된 것 중 Canon SELPHY CP1500을 자동으로 찾는다. 못 찾으면 인쇄하지 않고 실패를 돌려준다
  *       (다른 프린터로 잘못 나가지 않게). PRINTER_NAME 을 주면 그 프린터를 쓴다.
- *       용지는 카드 크기(54×86mm)다. 여백 없음(Fullbleed)은 프린터가 용지보다 크게 찍어 카드 테두리가 잘리므로
- *       여백 있는 인쇄로 카드 전체(테두리 포함)를 용지 안에 맞춘다. 가장자리에 얇은 흰 여백이 생긴다.
- *       맥은 54x86mm 로 보낸다(PRINT_MEDIA 로 바꿀 수 있다). 윈도우는 드라이버 기본 용지를 카드 크기로 맞춰 둔다.
+ *       용지는 카드 크기(54×86mm)다. 여백 있는 인쇄는 프린터가 가장자리를 크게 비워 카드가 작게 나오고,
+ *       여백 없음(Fullbleed)은 용지보다 조금 크게 찍어 테두리가 잘린다. 그래서 여백 없음에 카드 둘레 흰 여유를 붙여 보낸다.
+ *       맥은 54x86mm.Fullbleed 로 보내고, 카드 둘레에 흰 여유를 붙여 테두리가 잘리지 않게 한다(PRINT_MEDIA·PRINT_SAFE 로 바꿀 수 있다). 윈도우는 드라이버 기본 용지를 카드 크기로 맞춰 둔다.
  *       받는 값은 백엔드의 카드 경로뿐이라 다른 주소의 파일은 인쇄하지 않는다.
  *
  * 수정 이력:
+ *   - 2026-11-27 여백 있는 인쇄는 카드가 49mm 폭으로 작게 나와, 여백 없음 + 카드 둘레 흰 여유(3%)로 크게
  *   - 2026-11-26 최초 작성
  *   - 2026-11-26 여백 없음 인쇄에서 테두리가 잘려 여백 있는 카드 크기(54x86mm)로, 윈도우도 가장자리 여유를 둠
  *   - 2026-11-26 용지를 엽서에서 카드 크기(54×86mm)로, 카드 전체가 보이게 비율 유지해 맞춤
@@ -34,6 +35,9 @@ const CARD_PATH = /^\/cards\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(png|jpe?g)$/;
 
 // 부스 프린터 이름에 들어 있는 말 (macOS: Canon_SELPHY_CP1500, 윈도우: Canon SELPHY CP1500)
 const BOOTH_PRINTER = /SELPHY.*CP1500|CP1500/i;
+
+// 카드 용지 크기(mm)
+const PAPER = { w: 54, h: 86 };
 
 // 이미지 한 장을 용지에 여백 없이 꽉 채워 인쇄한다. 경로와 프린터 이름은 환경 변수로 넘겨 명령에 섞이지 않게 한다.
 // 프린터 이름이 없으면 설치된 프린터 중 CP1500을 찾고, 없으면 실패한다 (기본 프린터로 잘못 나가지 않게).
@@ -95,8 +99,30 @@ async function printFile(file: string) {
   }
   const printer = process.env.PRINTER_NAME || (await findBoothPrinter());
   if (!printer) throw new Error("CP1500 프린터를 찾을 수 없음");
-  const media = process.env.PRINT_MEDIA || "54x86mm";
+  // 여백 있는 인쇄는 프린터가 위아래 6.4mm·좌우 2.5mm를 비워 카드가 49mm 폭으로 작게 나온다.
+  // 그래서 여백 없음으로 보내되, 프린터가 가장자리를 조금 넘겨 찍어 테두리가 잘리지 않게 카드 둘레에 흰 여유를 직접 붙인다.
+  const media = process.env.PRINT_MEDIA || "54x86mm.Fullbleed";
+  if (media.endsWith(".Fullbleed")) await padForFullbleed(file);
   await run("lp", ["-d", printer, "-o", `media=${media}`, "-o", "fit-to-page", file], { timeout: 60_000 });
+}
+
+/** 카드 둘레에 흰 여유를 붙여 용지 비율(54:86)로 맞춘다. 여유는 폭의 PRINT_SAFE(기본 3%)씩 양쪽. */
+async function padForFullbleed(file: string) {
+  const { stdout } = await run("sips", ["-g", "pixelWidth", "-g", "pixelHeight", file], { timeout: 10_000 });
+  const width = Number(/pixelWidth: (\d+)/.exec(stdout)?.[1]);
+  const height = Number(/pixelHeight: (\d+)/.exec(stdout)?.[1]);
+  if (!width || !height) return;
+  const safe = Number(process.env.PRINT_SAFE ?? 0.03);
+  // 카드가 용지보다 가로로 넓은 비율이라 폭 기준으로 여유를 두고, 높이는 용지 비율에 맞춰 늘린다
+  let padWidth = Math.round(width / (1 - safe * 2));
+  let padHeight = Math.round((padWidth * PAPER.h) / PAPER.w);
+  if (padHeight < height / (1 - safe * 2)) {
+    padHeight = Math.round(height / (1 - safe * 2));
+    padWidth = Math.round((padHeight * PAPER.w) / PAPER.h);
+  }
+  await run("sips", ["--padToHeightWidth", String(padHeight), String(padWidth), "--padColor", "FFFFFF", file], {
+    timeout: 20_000,
+  });
 }
 
 export async function POST(request: Request) {
