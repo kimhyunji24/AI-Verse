@@ -10,6 +10,7 @@
  *
  * 수정 이력:
  *   - 2026-11-03 최초 작성
+ *   - 2026-11-27 인쇄 대신 QR로 카드 저장 (NEXT_PUBLIC_PRINT=1 이면 자동 인쇄)
  *   - 2026-11-03 분석 이후의 설문, 캐릭터 생성, 결과 단계 추가
  *   - 2026-11-03 버튼 입력을 useArcadeButton으로 분리해 입력이 씹히는 문제 수정
  *   - 2026-11-03 측정 시간을 프레임 수 대신 실제 시간 기준으로 변경 (느린 기기에서 길어지지 않도록)
@@ -38,6 +39,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Cauldron, { type CauldronMood } from "@/components/Cauldron";
 import { createPortal } from "react-dom";
 
+import CardQr from "@/components/CardQr";
 import CharacterResult from "@/components/CharacterResult";
 import FaceLookPanel from "@/components/FaceLookPanel";
 import FaceScanReport from "@/components/FaceScanReport";
@@ -112,6 +114,8 @@ const BREW_MIN_MS = 3000;
 const BURST_MS = 1200;
 // 카드가 공개된 뒤 자동으로 인쇄하기까지 (뒤집히는 연출 약 2초 + 카드를 볼 시간)
 const AUTO_PRINT_MS = 6000;
+// 인쇄 사용 여부. 기본은 인쇄하지 않고 QR로 카드를 저장하게 한다. NEXT_PUBLIC_PRINT=1 이면 예전처럼 자동 인쇄한다.
+const PRINT_ENABLED = process.env.NEXT_PUBLIC_PRINT === "1";
 const INGREDIENT_GAP_MS = 450;
 
 const ALIGNMENT_MESSAGES: Record<Alignment, string> = {
@@ -414,14 +418,15 @@ export default function ObservatoryFlow() {
   // 다시 그려도 소용없는 실패면 글 카드로라도 마무리한다.
   const pressCard = useCallback(() => {
     if (photocard && !revealed) setRevealed(true);
-    else if (photocard) printCard();
+    else if (photocard && PRINT_ENABLED) printCard();
+    else if (photocard) restart();
     else if (cardFailure && !cardFailure.retryable) setStep("printing");
     else if (cardFailure && character) drawCard(character);
-  }, [photocard, revealed, printCard, cardFailure, character, drawCard]);
+  }, [photocard, revealed, printCard, restart, cardFailure, character, drawCard]);
 
   // 자동 인화: 카드가 공개되고 잠시 보여 준 뒤 저절로 인쇄한다
   useEffect(() => {
-    if (step !== "card" || !photocard || !revealed) return;
+    if (!PRINT_ENABLED || step !== "card" || !photocard || !revealed) return;
     const timer = setTimeout(printCard, AUTO_PRINT_MS);
     return () => clearTimeout(timer);
   }, [step, photocard, revealed, printCard]);
@@ -725,15 +730,20 @@ export default function ObservatoryFlow() {
               Enter를 눌러 내 부캐를 확인해 보세요
             </p>
           )}
-          {step === "card" && photocard && revealed && (
+          {photocard && revealed && (
             // 카드가 다 뒤집힌 뒤에 나타난다
+            <div className="anim-card-appear" style={{ animationDelay: "1.1s" }}>
+              <CardQr cardUrl={photocard.card_url} />
+            </div>
+          )}
+          {step === "card" && photocard && revealed && (
             <button
               type="button"
               onClick={pressCard}
               className={`anim-card-appear ${primaryButton}`}
               style={{ animationDelay: "1.1s" }}
             >
-              곧 자동으로 인쇄돼요 · 바로 인쇄 (Enter)
+              {PRINT_ENABLED ? "곧 자동으로 인쇄돼요 · 바로 인쇄 (Enter)" : "저장했으면 처음으로 (Enter)"}
             </button>
           )}
           {step === "printing" && (

@@ -17,6 +17,7 @@
  *   - 2026-11-26 캔버스 연출 대신 카드 공개 영상을 그대로 틀고, 누르면 섬광과 함께 앞면으로 바뀌도록 변경
  *   - 2026-11-26 영상을 카드 자리 대신 화면 전체에 틀도록 변경
  *   - 2026-11-26 영상 대신 화면 전체 실시간 연출로 교체 (영상처럼 보이지 않게, 누르는 순간에 반응)
+ *   - 2026-11-27 카드 비율을 인쇄 용지(54×86mm)에 맞춤
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -31,7 +32,7 @@ function CardBack() {
   const gold = "#e0bb72";
   return (
     <div className="reveal-face reveal-back" aria-hidden="true">
-      <svg viewBox="0 0 100 148" className="h-full w-full">
+      <svg viewBox="0 -5.65 100 159.3" className="h-full w-full">
         <defs>
           <radialGradient id="reveal-back-bg" cx="50%" cy="48%" r="72%">
             <stop offset="0%" stopColor="#262447" />
@@ -43,15 +44,15 @@ function CardBack() {
             <stop offset="100%" stopColor="#fff3d6" stopOpacity="0" />
           </radialGradient>
         </defs>
-        <rect x="0" y="0" width="100" height="148" rx="6" fill="url(#reveal-back-bg)" />
+        <rect x="0" y="-5.65" width="100" height="159.3" rx="6" fill="url(#reveal-back-bg)" />
         {/* 이중 테두리와 네 귀퉁이 장식 */}
-        <rect x="3.5" y="3.5" width="93" height="141" rx="4" fill="none" stroke={gold} strokeWidth="0.9" />
-        <rect x="6.5" y="6.5" width="87" height="135" rx="2.5" fill="none" stroke={gold} strokeOpacity="0.55" strokeWidth="0.4" />
+        <rect x="3.5" y="-2.15" width="93" height="152.3" rx="4" fill="none" stroke={gold} strokeWidth="0.9" />
+        <rect x="6.5" y="0.85" width="87" height="146.3" rx="2.5" fill="none" stroke={gold} strokeOpacity="0.55" strokeWidth="0.4" />
         {[
-          [6.5, 6.5, 1, 1],
-          [93.5, 6.5, -1, 1],
-          [6.5, 141.5, 1, -1],
-          [93.5, 141.5, -1, -1],
+          [6.5, 0.85, 1, 1],
+          [93.5, 0.85, -1, 1],
+          [6.5, 147.15, 1, -1],
+          [93.5, 147.15, -1, -1],
         ].map(([x, y, sx, sy]) => (
           <path
             key={`${x}-${y}`}
@@ -151,7 +152,7 @@ export default function CardReveal({
   return (
     <>
       {/* 연출이 끝나면 이 자리에 카드 앞면이 남는다 */}
-      <div className={`relative aspect-[100/148] w-[min(92vw,26rem)] ${className}`}>
+      <div className={`relative aspect-[54/86] w-[min(92vw,26rem)] ${className}`}>
         {overlay !== "open" && <div className="reveal-settled">{children}</div>}
       </div>
       {overlay !== "gone" &&
