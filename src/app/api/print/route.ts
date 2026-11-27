@@ -12,6 +12,7 @@
  *       받는 값은 백엔드의 카드 경로뿐이라 다른 주소의 파일은 인쇄하지 않는다.
  *
  * 수정 이력:
+ *   - 2026-11-27 프린터가 에러로 멈추면 자동으로 다시 켜 남은 작업을 이어서 인쇄
  *   - 2026-11-27 여백 있는 인쇄는 카드가 49mm 폭으로 작게 나와, 여백 없음 + 카드 둘레 흰 여유(3%)로 크게
  *   - 2026-11-26 최초 작성
  *   - 2026-11-26 여백 없음 인쇄에서 테두리가 잘려 여백 있는 카드 크기(54x86mm)로, 윈도우도 가장자리 여유를 둠
@@ -89,6 +90,38 @@ async function findBoothPrinter(): Promise<string | null> {
   return names[0];
 }
 
+/**
+ * 프린터가 에러로 꺼지면(용지·잉크 교체, USB 순간 끊김 등) CUPS는 그 프린터를 '비활성화'하고 남은 작업을 멈춘다.
+ * 부스에서는 사람이 손대지 않아도 되도록, 꺼져 있으면 다시 켜서 멈춘 작업이 이어서 인쇄되게 한다.
+ * lpstat -p 문구는 시스템 언어로 나와서 영어(disabled)와 한국어(비활성화) 둘 다 본다.
+ */
+async function enableIfStopped(printer: string) {
+  const { stdout } = await run("lpstat", ["-p", printer], { timeout: 10_000 }).catch(() => ({ stdout: "" }));
+  if (!/disabled|비활성화/i.test(stdout)) return;
+  console.warn(`프린터 ${printer}가 멈춰 있어 다시 켬:`, stdout.trim());
+  await run("cupsenable", [printer], { timeout: 10_000 }).catch((error) => console.error("프린터 다시 켜기 실패", error));
+}
+
+// 인쇄를 보낸 뒤에도 일정 시간 지켜보다가 멈추면 다시 켠다. 대기열이 비면 멈춘다.
+const WATCH_EVERY_MS = 15_000;
+const WATCH_FOR_MS = 10 * 60_000;
+let watchUntil = 0;
+let watching: ReturnType<typeof setInterval> | null = null;
+
+function watchPrinter(printer: string) {
+  watchUntil = Date.now() + WATCH_FOR_MS;
+  if (watching) return;
+  watching = setInterval(async () => {
+    const { stdout: queue } = await run("lpstat", ["-o", printer], { timeout: 10_000 }).catch(() => ({ stdout: "" }));
+    if (!queue.trim() || Date.now() > watchUntil) {
+      clearInterval(watching!);
+      watching = null;
+      return;
+    }
+    await enableIfStopped(printer);
+  }, WATCH_EVERY_MS);
+}
+
 async function printFile(file: string) {
   if (process.platform === "win32") {
     await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_SCRIPT], {
@@ -103,7 +136,9 @@ async function printFile(file: string) {
   // 그래서 여백 없음으로 보내되, 프린터가 가장자리를 조금 넘겨 찍어 테두리가 잘리지 않게 카드 둘레에 흰 여유를 직접 붙인다.
   const media = process.env.PRINT_MEDIA || "54x86mm.Fullbleed";
   if (media.endsWith(".Fullbleed")) await padForFullbleed(file);
+  await enableIfStopped(printer);
   await run("lp", ["-d", printer, "-o", `media=${media}`, "-o", "fit-to-page", file], { timeout: 60_000 });
+  watchPrinter(printer);
 }
 
 /** 카드 둘레에 흰 여유를 붙여 용지 비율(54:86)로 맞춘다. 여유는 폭의 PRINT_SAFE(기본 3%)씩 양쪽. */
@@ -113,7 +148,7 @@ async function padForFullbleed(file: string) {
   const height = Number(/pixelHeight: (\d+)/.exec(stdout)?.[1]);
   if (!width || !height) return;
   const safe = Number(process.env.PRINT_SAFE ?? 0.03);
-  // 카드가 용지보다 가로로 넓은 비율이라 폭 기준으로 여유를 두고, 높이는 용지 비율에 맞춰 늘린다
+  // 폭 기준으로 여유를 두고 높이를 용지 비율에 맞춘다 (카드가 더 길쭉하면 높이 기준)
   let padWidth = Math.round(width / (1 - safe * 2));
   let padHeight = Math.round((padWidth * PAPER.h) / PAPER.w);
   if (padHeight < height / (1 - safe * 2)) {
