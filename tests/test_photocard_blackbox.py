@@ -26,8 +26,8 @@ from PIL import Image
 
 from tests.test_character_blackbox import ANSWERS, FEATURES
 
-# 100×148mm @ 300dpi
-CARD_SIZE = (1181, 1748)
+# 54×86mm 비율
+CARD_SIZE = (1181, 1881)
 
 
 def make_character(client, **answers):
